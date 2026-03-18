@@ -3,8 +3,6 @@ package com.kayzwilson.retrace
 import android.os.Bundle
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
-import androidx.compose.animation.*
-import androidx.compose.animation.core.*
 import androidx.compose.foundation.*
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.shape.CircleShape
@@ -12,6 +10,7 @@ import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.text.KeyboardActions
 import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.Badge
 import androidx.compose.material.icons.filled.Email
 import androidx.compose.material.icons.filled.Lock
 import androidx.compose.material.icons.filled.Visibility
@@ -37,18 +36,20 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import kotlinx.coroutines.delay
 
+// ─── Brand Colors ─────────────────────────────────────────────────────────────
+val RetraceNavy    = Color(0xFF1F1A44)
+val RetraceMidBlue = Color(0xFF2B4EA8)
+val RetraceSkyBlue = Color(0xFF4A90D9)
+val RetraceAccent  = Color(0xFF5B8FF9)
+val RetraceWhite   = Color.White
+val RetraceLightBg = Color(0xFFF4F7FE)
+val RetraceGrey    = Color(0xFF8A94A6)
+val RetraceError   = Color(0xFFE53935)
 
-// ─── Brand Colors ────────────────────────────────────────────────────────────
-val RetraceNavy     = Color(0xFF1F1A44)
-val RetraceMidBlue  = Color(0xFF2B4EA8)
-val RetraceSkyBlue  = Color(0xFF4A90D9)
-val RetraceAccent   = Color(0xFF5B8FF9)
-val RetraceWhite    = Color.White
-val RetraceLightBg  = Color(0xFFF4F7FE)
-val RetraceGrey     = Color(0xFF8A94A6)
-val RetraceError    = Color(0xFFE53935)
+// ─── Navigation State ─────────────────────────────────────────────────────────
+enum class Screen { SPLASH, LOGIN, SIGNUP }
 
-// ─── Entry Point ─────────────────────────────────────────────────────────────
+// ─── Entry Point ──────────────────────────────────────────────────────────────
 class MainActivity : ComponentActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
@@ -58,15 +59,21 @@ class MainActivity : ComponentActivity() {
 
 @Composable
 fun RetraceApp() {
-    var showSplash by remember { mutableStateOf(true) }
-    LaunchedEffect(true) {
+    var currentScreen by remember { mutableStateOf(Screen.SPLASH) }
+
+    LaunchedEffect(Unit) {
         delay(2000)
-        showSplash = false
+        currentScreen = Screen.LOGIN
     }
-    if (showSplash) SplashScreen() else LoginScreen()
+
+    when (currentScreen) {
+        Screen.SPLASH  -> SplashScreen()
+        Screen.LOGIN   -> LoginScreen(onNavigateToSignUp = { currentScreen = Screen.SIGNUP })
+        Screen.SIGNUP  -> SignUpScreen(onNavigateToLogin = { currentScreen = Screen.LOGIN })
+    }
 }
 
-// ─── Splash Screen (unchanged) ───────────────────────────────────────────────
+// ─── Splash Screen ────────────────────────────────────────────────────────────
 @Composable
 fun SplashScreen() {
     Box(
@@ -90,70 +97,116 @@ fun SplashScreen() {
     }
 }
 
-// ─── Login Screen ────────────────────────────────────────────────────────────
+// ─── Shared Header Block ──────────────────────────────────────────────────────
 @Composable
-fun LoginScreen() {
+fun RetraceScreenHeader(subtitle: String) {
+    // Gradient background
+    Box(
+        modifier = Modifier
+            .fillMaxWidth()
+            .height(260.dp)
+            .background(
+                Brush.verticalGradient(
+                    colors = listOf(RetraceNavy, RetraceMidBlue, RetraceLightBg)
+                )
+            )
+    )
+    // Decorative circles
+    Box(
+        modifier = Modifier
+            .size(180.dp)
+            .offset(x = (-50).dp, y = (-40).dp)
+            .clip(CircleShape)
+            .background(RetraceAccent.copy(alpha = 0.15f))
+    )
+    Box(
+        modifier = Modifier
+            .size(120.dp)
+            .offset(x = 40.dp, y = 20.dp)
+            .clip(CircleShape)
+            .background(RetraceSkyBlue.copy(alpha = 0.18f))
+    )
+}
+
+// ─── Shared Text Field ────────────────────────────────────────────────────────
+@Composable
+fun RetraceTextField(
+    value: String,
+    onValueChange: (String) -> Unit,
+    label: String,
+    placeholder: String,
+    isError: Boolean = false,
+    errorMessage: String = "",
+    leadingIcon: @Composable () -> Unit,
+    trailingIcon: (@Composable () -> Unit)? = null,
+    visualTransformation: VisualTransformation = VisualTransformation.None,
+    keyboardOptions: KeyboardOptions = KeyboardOptions.Default,
+    keyboardActions: KeyboardActions = KeyboardActions.Default
+) {
+    OutlinedTextField(
+        value = value,
+        onValueChange = onValueChange,
+        label = { Text(label) },
+        placeholder = { Text(placeholder) },
+        leadingIcon = leadingIcon,
+        trailingIcon = trailingIcon,
+        isError = isError,
+        supportingText = {
+            if (isError && errorMessage.isNotEmpty())
+                Text(errorMessage, color = RetraceError, fontSize = 12.sp)
+        },
+        visualTransformation = visualTransformation,
+        keyboardOptions = keyboardOptions,
+        keyboardActions = keyboardActions,
+        singleLine = true,
+        modifier = Modifier.fillMaxWidth(),
+        shape = RoundedCornerShape(14.dp),
+        colors = OutlinedTextFieldDefaults.colors(
+            focusedBorderColor = RetraceMidBlue,
+            unfocusedBorderColor = Color(0xFFDDE3F0),
+            focusedLabelColor = RetraceMidBlue,
+            errorBorderColor = RetraceError
+        )
+    )
+}
+
+// ─── Login Screen ─────────────────────────────────────────────────────────────
+@Composable
+fun LoginScreen(onNavigateToSignUp: () -> Unit) {
     val focusManager = LocalFocusManager.current
 
-    var email        by remember { mutableStateOf("") }
-    var password     by remember { mutableStateOf("") }
+    var email           by remember { mutableStateOf("") }
+    var password        by remember { mutableStateOf("") }
     var passwordVisible by remember { mutableStateOf(false) }
-    var rememberMe   by remember { mutableStateOf(false) }
-    var isLoading    by remember { mutableStateOf(false) }
+    var rememberMe      by remember { mutableStateOf(false) }
+    var isLoading       by remember { mutableStateOf(false) }
 
-    // Validation states
     val emailError    = email.isNotEmpty() && !android.util.Patterns.EMAIL_ADDRESS.matcher(email).matches()
     val passwordError = password.isNotEmpty() && password.length < 6
     val canSubmit     = email.isNotEmpty() && password.isNotEmpty() && !emailError && !passwordError
 
-    // Animated top wave offset
-    val infiniteTransition = rememberInfiniteTransition(label = "wave")
-    val waveOffset by infiniteTransition.animateFloat(
-        initialValue = 0f, targetValue = 1f,
-        animationSpec = infiniteRepeatable(tween(4000, easing = LinearEasing), RepeatMode.Reverse),
-        label = "waveAnim"
-    )
-
     Box(modifier = Modifier.fillMaxSize().background(RetraceLightBg)) {
 
-        // ── Decorative header gradient ──────────────────────────────────────
+        // Decorative header
         Box(
-            modifier = Modifier
-                .fillMaxWidth()
-                .height(260.dp)
-                .background(
-                    Brush.verticalGradient(
-                        colors = listOf(RetraceNavy, RetraceMidBlue, RetraceLightBg)
-                    )
-                )
+            modifier = Modifier.fillMaxWidth().height(260.dp).background(
+                Brush.verticalGradient(colors = listOf(RetraceNavy, RetraceMidBlue, RetraceLightBg))
+            )
+        )
+        Box(
+            modifier = Modifier.size(180.dp).offset(x = (-50).dp, y = (-40).dp)
+                .clip(CircleShape).background(RetraceAccent.copy(alpha = 0.15f))
+        )
+        Box(
+            modifier = Modifier.size(120.dp).align(Alignment.TopEnd).offset(x = 40.dp, y = 20.dp)
+                .clip(CircleShape).background(RetraceSkyBlue.copy(alpha = 0.18f))
         )
 
-        // ── Decorative circle accent ────────────────────────────────────────
-        Box(
-            modifier = Modifier
-                .size(180.dp)
-                .offset(x = (-50).dp, y = (-40).dp)
-                .clip(CircleShape)
-                .background(RetraceAccent.copy(alpha = 0.15f))
-        )
-        Box(
-            modifier = Modifier
-                .size(120.dp)
-                .align(Alignment.TopEnd)
-                .offset(x = 40.dp, y = 20.dp)
-                .clip(CircleShape)
-                .background(RetraceSkyBlue.copy(alpha = 0.18f))
-        )
-
-        // ── Main scrollable content ─────────────────────────────────────────
         Column(
-            modifier = Modifier
-                .fillMaxSize()
-                .verticalScroll(rememberScrollState())
+            modifier = Modifier.fillMaxSize().verticalScroll(rememberScrollState())
                 .padding(horizontal = 28.dp),
             horizontalAlignment = Alignment.CenterHorizontally
         ) {
-
             Spacer(modifier = Modifier.height(56.dp))
 
             // Logo + wordmark
@@ -163,28 +216,18 @@ fun LoginScreen() {
                 modifier = Modifier.size(80.dp)
             )
             Spacer(modifier = Modifier.height(10.dp))
-            Text(
-                text = "RETRACE",
-                fontSize = 26.sp,
-                fontWeight = FontWeight.ExtraBold,
-                color = RetraceWhite,
-                letterSpacing = 4.sp
-            )
+            Text("RETRACE", fontSize = 26.sp, fontWeight = FontWeight.ExtraBold,
+                color = RetraceWhite, letterSpacing = 4.sp)
             Spacer(modifier = Modifier.height(4.dp))
-            Text(
-                text = "Find what's lost. Return what matters.",
-                fontSize = 13.sp,
-                color = RetraceWhite.copy(alpha = 0.75f),
-                textAlign = TextAlign.Center
-            )
+            Text("Find what's lost. Return what matters.",
+                fontSize = 13.sp, color = RetraceWhite.copy(alpha = 0.75f),
+                textAlign = TextAlign.Center)
 
             Spacer(modifier = Modifier.height(36.dp))
 
-            // ── Card ───────────────────────────────────────────────────────
+            // Card
             Card(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .shadow(16.dp, RoundedCornerShape(24.dp)),
+                modifier = Modifier.fillMaxWidth().shadow(16.dp, RoundedCornerShape(24.dp)),
                 shape = RoundedCornerShape(24.dp),
                 colors = CardDefaults.cardColors(containerColor = RetraceWhite),
                 elevation = CardDefaults.cardElevation(0.dp)
@@ -193,107 +236,55 @@ fun LoginScreen() {
                     modifier = Modifier.padding(horizontal = 24.dp, vertical = 32.dp),
                     horizontalAlignment = Alignment.CenterHorizontally
                 ) {
-
-                    Text(
-                        text = "Welcome back",
-                        fontSize = 22.sp,
-                        fontWeight = FontWeight.Bold,
-                        color = RetraceNavy
-                    )
+                    Text("Welcome back", fontSize = 22.sp, fontWeight = FontWeight.Bold, color = RetraceNavy)
                     Spacer(modifier = Modifier.height(4.dp))
-                    Text(
-                        text = "Sign in to continue",
-                        fontSize = 14.sp,
-                        color = RetraceGrey
-                    )
-
+                    Text("Sign in to continue", fontSize = 14.sp, color = RetraceGrey)
                     Spacer(modifier = Modifier.height(28.dp))
 
-                    // ── Email field ─────────────────────────────────────────
-                    OutlinedTextField(
-                        value = email,
-                        onValueChange = { email = it },
-                        label = { Text("Email address") },
-                        placeholder = { Text("you@example.com") },
+                    // Email
+                    RetraceTextField(
+                        value = email, onValueChange = { email = it },
+                        label = "Email address", placeholder = "you@campus.ac.ug",
+                        isError = emailError, errorMessage = "Enter a valid email",
                         leadingIcon = {
-                            Icon(
-                                Icons.Default.Email,
-                                contentDescription = null,
-                                tint = if (emailError) RetraceError else RetraceMidBlue
-                            )
-                        },
-                        isError = emailError,
-                        supportingText = {
-                            if (emailError) Text("Enter a valid email", color = RetraceError, fontSize = 12.sp)
+                            Icon(Icons.Default.Email, null,
+                                tint = if (emailError) RetraceError else RetraceMidBlue)
                         },
                         keyboardOptions = KeyboardOptions(
-                            keyboardType = KeyboardType.Email,
-                            imeAction = ImeAction.Next
-                        ),
+                            keyboardType = KeyboardType.Email, imeAction = ImeAction.Next),
                         keyboardActions = KeyboardActions(
-                            onNext = { focusManager.moveFocus(FocusDirection.Down) }
-                        ),
-                        singleLine = true,
-                        modifier = Modifier.fillMaxWidth(),
-                        shape = RoundedCornerShape(14.dp),
-                        colors = OutlinedTextFieldDefaults.colors(
-                            focusedBorderColor = RetraceMidBlue,
-                            unfocusedBorderColor = Color(0xFFDDE3F0),
-                            focusedLabelColor = RetraceMidBlue,
-                            errorBorderColor = RetraceError
-                        )
+                            onNext = { focusManager.moveFocus(FocusDirection.Down) })
                     )
 
                     Spacer(modifier = Modifier.height(16.dp))
 
-                    // ── Password field ──────────────────────────────────────
-                    OutlinedTextField(
-                        value = password,
-                        onValueChange = { password = it },
-                        label = { Text("Password") },
-                        placeholder = { Text("Min. 6 characters") },
+                    // Password
+                    RetraceTextField(
+                        value = password, onValueChange = { password = it },
+                        label = "Password", placeholder = "Min. 6 characters",
+                        isError = passwordError, errorMessage = "Password must be at least 6 characters",
                         leadingIcon = {
-                            Icon(
-                                Icons.Default.Lock,
-                                contentDescription = null,
-                                tint = if (passwordError) RetraceError else RetraceMidBlue
-                            )
+                            Icon(Icons.Default.Lock, null,
+                                tint = if (passwordError) RetraceError else RetraceMidBlue)
                         },
                         trailingIcon = {
                             IconButton(onClick = { passwordVisible = !passwordVisible }) {
                                 Icon(
                                     imageVector = if (passwordVisible) Icons.Default.Visibility else Icons.Default.VisibilityOff,
-                                    contentDescription = if (passwordVisible) "Hide password" else "Show password",
+                                    contentDescription = if (passwordVisible) "Hide" else "Show",
                                     tint = RetraceGrey
                                 )
                             }
                         },
                         visualTransformation = if (passwordVisible) VisualTransformation.None else PasswordVisualTransformation(),
-                        isError = passwordError,
-                        supportingText = {
-                            if (passwordError) Text("Password must be at least 6 characters", color = RetraceError, fontSize = 12.sp)
-                        },
                         keyboardOptions = KeyboardOptions(
-                            keyboardType = KeyboardType.Password,
-                            imeAction = ImeAction.Done
-                        ),
-                        keyboardActions = KeyboardActions(
-                            onDone = { focusManager.clearFocus() }
-                        ),
-                        singleLine = true,
-                        modifier = Modifier.fillMaxWidth(),
-                        shape = RoundedCornerShape(14.dp),
-                        colors = OutlinedTextFieldDefaults.colors(
-                            focusedBorderColor = RetraceMidBlue,
-                            unfocusedBorderColor = Color(0xFFDDE3F0),
-                            focusedLabelColor = RetraceMidBlue,
-                            errorBorderColor = RetraceError
-                        )
+                            keyboardType = KeyboardType.Password, imeAction = ImeAction.Done),
+                        keyboardActions = KeyboardActions(onDone = { focusManager.clearFocus() })
                     )
 
                     Spacer(modifier = Modifier.height(12.dp))
 
-                    // ── Remember me + Forgot password ───────────────────────
+                    // Remember me + Forgot password
                     Row(
                         modifier = Modifier.fillMaxWidth(),
                         horizontalArrangement = Arrangement.SpaceBetween,
@@ -304,39 +295,26 @@ fun LoginScreen() {
                             modifier = Modifier.clickable { rememberMe = !rememberMe }
                         ) {
                             Checkbox(
-                                checked = rememberMe,
-                                onCheckedChange = { rememberMe = it },
+                                checked = rememberMe, onCheckedChange = { rememberMe = it },
                                 colors = CheckboxDefaults.colors(
-                                    checkedColor = RetraceMidBlue,
-                                    uncheckedColor = RetraceGrey
-                                )
+                                    checkedColor = RetraceMidBlue, uncheckedColor = RetraceGrey)
                             )
                             Spacer(modifier = Modifier.width(4.dp))
                             Text("Remember me", fontSize = 13.sp, color = RetraceGrey)
                         }
-
-                        TextButton(onClick = { /* navigate to forgot password */ }) {
-                            Text(
-                                "Forgot password?",
-                                fontSize = 13.sp,
-                                color = RetraceMidBlue,
-                                fontWeight = FontWeight.SemiBold
-                            )
+                        TextButton(onClick = { /* TODO: forgot password */ }) {
+                            Text("Forgot password?", fontSize = 13.sp,
+                                color = RetraceMidBlue, fontWeight = FontWeight.SemiBold)
                         }
                     }
 
                     Spacer(modifier = Modifier.height(24.dp))
 
-                    // ── Sign In button ──────────────────────────────────────
+                    // Sign In button
                     Button(
-                        onClick = {
-                            isLoading = true
-                            // TODO: handle authentication
-                        },
+                        onClick = { isLoading = true /* TODO: authenticate */ },
                         enabled = canSubmit && !isLoading,
-                        modifier = Modifier
-                            .fillMaxWidth()
-                            .height(54.dp),
+                        modifier = Modifier.fillMaxWidth().height(54.dp),
                         shape = RoundedCornerShape(14.dp),
                         colors = ButtonDefaults.buttonColors(
                             containerColor = RetraceMidBlue,
@@ -347,59 +325,251 @@ fun LoginScreen() {
                         if (isLoading) {
                             CircularProgressIndicator(
                                 modifier = Modifier.size(22.dp),
-                                color = RetraceWhite,
-                                strokeWidth = 2.5.dp
-                            )
+                                color = RetraceWhite, strokeWidth = 2.5.dp)
                         } else {
-                            Text(
-                                text = "Sign In",
-                                fontSize = 16.sp,
-                                fontWeight = FontWeight.Bold,
-                                letterSpacing = 1.sp
-                            )
+                            Text("Sign In", fontSize = 16.sp,
+                                fontWeight = FontWeight.Bold, letterSpacing = 1.sp)
                         }
                     }
 
                     Spacer(modifier = Modifier.height(24.dp))
 
-                    // ── Divider ─────────────────────────────────────────────
-                    Row(
-                        modifier = Modifier.fillMaxWidth(),
-                        verticalAlignment = Alignment.CenterVertically
-                    ) {
+                    // Divider
+                    Row(modifier = Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
                         Divider(modifier = Modifier.weight(1f), color = Color(0xFFDDE3F0))
-                        Text(
-                            "  Don't have an account?  ",
-                            fontSize = 12.sp,
-                            color = RetraceGrey
-                        )
+                        Text("  Don't have an account?  ", fontSize = 12.sp, color = RetraceGrey)
                         Divider(modifier = Modifier.weight(1f), color = Color(0xFFDDE3F0))
                     }
 
                     Spacer(modifier = Modifier.height(20.dp))
 
-                    // ── Google SSO button ───────────────────────────────────
+                    // Sign Up button
                     OutlinedButton(
-                        onClick = { /* TODO: Google Sign-In */ },
-                        modifier = Modifier
-                            .fillMaxWidth()
-                            .height(50.dp),
+                        onClick = onNavigateToSignUp,
+                        modifier = Modifier.fillMaxWidth().height(50.dp),
                         shape = RoundedCornerShape(14.dp),
-                        border = BorderStroke(1.dp, Color(0xFFDDE3F0)),
-                        colors = ButtonDefaults.outlinedButtonColors(contentColor = RetraceNavy)
+                        border = BorderStroke(1.5.dp, RetraceMidBlue),
+                        colors = ButtonDefaults.outlinedButtonColors(contentColor = RetraceMidBlue)
                     ) {
-                        // Using a text placeholder — swap with actual Google icon drawable if available
-
-                        Text("Sign Up", fontSize = 14.sp, fontWeight = FontWeight.Medium)
+                        Text("Sign Up", fontSize = 15.sp, fontWeight = FontWeight.Bold)
                     }
                 }
             }
 
-            Spacer(modifier = Modifier.height(28.dp))
+            Spacer(modifier = Modifier.height(32.dp))
+        }
+    }
+}
 
+// ─── Sign Up Screen ───────────────────────────────────────────────────────────
+@Composable
+fun SignUpScreen(onNavigateToLogin: () -> Unit) {
+    val focusManager = LocalFocusManager.current
 
+    var studentId       by remember { mutableStateOf("") }
+    var email           by remember { mutableStateOf("") }
+    var password        by remember { mutableStateOf("") }
+    var confirmPassword by remember { mutableStateOf("") }
+    var passwordVisible        by remember { mutableStateOf(false) }
+    var confirmPasswordVisible by remember { mutableStateOf(false) }
+    var isLoading       by remember { mutableStateOf(false) }
 
-            Spacer(modifier = Modifier.height(104.dp))
+    // Validation
+    val studentIdError      = studentId.isNotEmpty() && studentId.length < 4
+    val emailError          = email.isNotEmpty() && !android.util.Patterns.EMAIL_ADDRESS.matcher(email).matches()
+    val passwordError       = password.isNotEmpty() && password.length < 6
+    val confirmPasswordError = confirmPassword.isNotEmpty() && confirmPassword != password
+    val canSubmit = studentId.isNotEmpty() && email.isNotEmpty() && password.isNotEmpty() &&
+            confirmPassword.isNotEmpty() && !studentIdError && !emailError &&
+            !passwordError && !confirmPasswordError
+
+    Box(modifier = Modifier.fillMaxSize().background(RetraceLightBg)) {
+
+        // Decorative header
+        Box(
+            modifier = Modifier.fillMaxWidth().height(260.dp).background(
+                Brush.verticalGradient(colors = listOf(RetraceNavy, RetraceMidBlue, RetraceLightBg))
+            )
+        )
+        Box(
+            modifier = Modifier.size(180.dp).offset(x = (-50).dp, y = (-40).dp)
+                .clip(CircleShape).background(RetraceAccent.copy(alpha = 0.15f))
+        )
+        Box(
+            modifier = Modifier.size(120.dp).align(Alignment.TopEnd).offset(x = 40.dp, y = 20.dp)
+                .clip(CircleShape).background(RetraceSkyBlue.copy(alpha = 0.18f))
+        )
+
+        Column(
+            modifier = Modifier.fillMaxSize().verticalScroll(rememberScrollState())
+                .padding(horizontal = 28.dp),
+            horizontalAlignment = Alignment.CenterHorizontally
+        ) {
+            Spacer(modifier = Modifier.height(56.dp))
+
+            // Logo + wordmark
+            Image(
+                painter = painterResource(id = R.drawable.retrace_logo),
+                contentDescription = "Retrace Logo",
+                modifier = Modifier.size(80.dp)
+            )
+            Spacer(modifier = Modifier.height(10.dp))
+            Text("RETRACE", fontSize = 26.sp, fontWeight = FontWeight.ExtraBold,
+                color = RetraceWhite, letterSpacing = 4.sp)
+            Spacer(modifier = Modifier.height(4.dp))
+            Text("Find what's lost. Return what matters.",
+                fontSize = 13.sp, color = RetraceWhite.copy(alpha = 0.75f),
+                textAlign = TextAlign.Center)
+
+            Spacer(modifier = Modifier.height(36.dp))
+
+            // Card
+            Card(
+                modifier = Modifier.fillMaxWidth().shadow(16.dp, RoundedCornerShape(24.dp)),
+                shape = RoundedCornerShape(24.dp),
+                colors = CardDefaults.cardColors(containerColor = RetraceWhite),
+                elevation = CardDefaults.cardElevation(0.dp)
+            ) {
+                Column(
+                    modifier = Modifier.padding(horizontal = 24.dp, vertical = 32.dp),
+                    horizontalAlignment = Alignment.CenterHorizontally
+                ) {
+                    Text("Create Account", fontSize = 22.sp, fontWeight = FontWeight.Bold, color = RetraceNavy)
+                    Spacer(modifier = Modifier.height(4.dp))
+                    Text("Join Retrace on your campus", fontSize = 14.sp, color = RetraceGrey)
+                    Spacer(modifier = Modifier.height(28.dp))
+
+                    // Student ID / Email
+                    RetraceTextField(
+                        value = studentId, onValueChange = { studentId = it },
+                        label = "StudentEmail", placeholder = "e.g. student@campus.ac.ug",
+                        isError = studentIdError, errorMessage = "Enter a valid studentEmail",
+                        leadingIcon = {
+                            Icon(Icons.Default.Badge, null,
+                                tint = if (studentIdError) RetraceError else RetraceMidBlue)
+                        },
+                        keyboardOptions = KeyboardOptions(
+                            keyboardType = KeyboardType.Text, imeAction = ImeAction.Next),
+                        keyboardActions = KeyboardActions(
+                            onNext = { focusManager.moveFocus(FocusDirection.Down) })
+                    )
+
+                    Spacer(modifier = Modifier.height(16.dp))
+
+                    // Email
+                    RetraceTextField(
+                        value = email, onValueChange = { email = it },
+                        label = "Email address", placeholder = "you@campus.ac.ug",
+                        isError = emailError, errorMessage = "Enter a valid email",
+                        leadingIcon = {
+                            Icon(Icons.Default.Email, null,
+                                tint = if (emailError) RetraceError else RetraceMidBlue)
+                        },
+                        keyboardOptions = KeyboardOptions(
+                            keyboardType = KeyboardType.Email, imeAction = ImeAction.Next),
+                        keyboardActions = KeyboardActions(
+                            onNext = { focusManager.moveFocus(FocusDirection.Down) })
+                    )
+
+                    Spacer(modifier = Modifier.height(16.dp))
+
+                    // Password
+                    RetraceTextField(
+                        value = password, onValueChange = { password = it },
+                        label = "Password", placeholder = "Min. 6 characters",
+                        isError = passwordError, errorMessage = "Password must be at least 6 characters",
+                        leadingIcon = {
+                            Icon(Icons.Default.Lock, null,
+                                tint = if (passwordError) RetraceError else RetraceMidBlue)
+                        },
+                        trailingIcon = {
+                            IconButton(onClick = { passwordVisible = !passwordVisible }) {
+                                Icon(
+                                    imageVector = if (passwordVisible) Icons.Default.Visibility else Icons.Default.VisibilityOff,
+                                    contentDescription = if (passwordVisible) "Hide" else "Show",
+                                    tint = RetraceGrey
+                                )
+                            }
+                        },
+                        visualTransformation = if (passwordVisible) VisualTransformation.None else PasswordVisualTransformation(),
+                        keyboardOptions = KeyboardOptions(
+                            keyboardType = KeyboardType.Password, imeAction = ImeAction.Next),
+                        keyboardActions = KeyboardActions(
+                            onNext = { focusManager.moveFocus(FocusDirection.Down) })
+                    )
+
+                    Spacer(modifier = Modifier.height(16.dp))
+
+                    // Confirm Password
+                    RetraceTextField(
+                        value = confirmPassword, onValueChange = { confirmPassword = it },
+                        label = "Confirm password", placeholder = "Re-enter your password",
+                        isError = confirmPasswordError, errorMessage = "Passwords do not match",
+                        leadingIcon = {
+                            Icon(Icons.Default.Lock, null,
+                                tint = if (confirmPasswordError) RetraceError else RetraceMidBlue)
+                        },
+                        trailingIcon = {
+                            IconButton(onClick = { confirmPasswordVisible = !confirmPasswordVisible }) {
+                                Icon(
+                                    imageVector = if (confirmPasswordVisible) Icons.Default.Visibility else Icons.Default.VisibilityOff,
+                                    contentDescription = if (confirmPasswordVisible) "Hide" else "Show",
+                                    tint = RetraceGrey
+                                )
+                            }
+                        },
+                        visualTransformation = if (confirmPasswordVisible) VisualTransformation.None else PasswordVisualTransformation(),
+                        keyboardOptions = KeyboardOptions(
+                            keyboardType = KeyboardType.Password, imeAction = ImeAction.Done),
+                        keyboardActions = KeyboardActions(onDone = { focusManager.clearFocus() })
+                    )
+
+                    Spacer(modifier = Modifier.height(28.dp))
+
+                    // Create Account button
+                    Button(
+                        onClick = { isLoading = true /* TODO: register user */ },
+                        enabled = canSubmit && !isLoading,
+                        modifier = Modifier.fillMaxWidth().height(54.dp),
+                        shape = RoundedCornerShape(14.dp),
+                        colors = ButtonDefaults.buttonColors(
+                            containerColor = RetraceMidBlue,
+                            disabledContainerColor = RetraceMidBlue.copy(alpha = 0.4f)
+                        ),
+                        elevation = ButtonDefaults.buttonElevation(defaultElevation = 4.dp)
+                    ) {
+                        if (isLoading) {
+                            CircularProgressIndicator(
+                                modifier = Modifier.size(22.dp),
+                                color = RetraceWhite, strokeWidth = 2.5.dp)
+                        } else {
+                            Text("Create Account", fontSize = 16.sp,
+                                fontWeight = FontWeight.Bold, letterSpacing = 1.sp)
+                        }
+                    }
+
+                    Spacer(modifier = Modifier.height(24.dp))
+
+                    // Back to login
+                    Row(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .clickable { onNavigateToLogin() },
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        Divider(modifier = Modifier.weight(1f), color = Color(0xFFDDE3F0))
+                        Text(
+                            "  Already have an account? Sign In  ",
+                            fontSize = 12.sp,
+                            color = RetraceMidBlue,
+                            fontWeight = FontWeight.SemiBold
+                        )
+                        Divider(modifier = Modifier.weight(1f), color = Color(0xFFDDE3F0))
+                    }
+                }
+            }
+
+            Spacer(modifier = Modifier.height(32.dp))
         }
     }
 }
