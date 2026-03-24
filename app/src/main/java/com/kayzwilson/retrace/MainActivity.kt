@@ -1,5 +1,6 @@
 package com.kayzwilson.retrace
 
+import com.google.firebase.auth.FirebaseAuth
 import android.os.Bundle
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
@@ -185,6 +186,8 @@ fun LoginScreen(onNavigateToSignUp: () -> Unit) {
     val passwordError = password.isNotEmpty() && password.length < 6
     val canSubmit     = email.isNotEmpty() && password.isNotEmpty() && !emailError && !passwordError
 
+    val auth = FirebaseAuth.getInstance()
+    println("Firebase connected: $auth")
     Box(modifier = Modifier.fillMaxSize().background(RetraceLightBg)) {
 
         // Decorative header
