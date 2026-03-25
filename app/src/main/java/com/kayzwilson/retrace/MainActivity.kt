@@ -50,7 +50,7 @@ val RetraceGrey    = Color(0xFF8A94A6)
 val RetraceError   = Color(0xFFE53935)
 
 // ─── Navigation State ─────────────────────────────────────────────────────────
-enum class Screen { SPLASH, LOGIN, SIGNUP }
+enum class Screen { SPLASH, LOGIN, SIGNUP, HOME }
 
 // ─── Entry Point ──────────────────────────────────────────────────────────────
 class MainActivity : ComponentActivity() {
@@ -71,8 +71,17 @@ fun RetraceApp() {
 
     when (currentScreen) {
         Screen.SPLASH  -> SplashScreen()
-        Screen.LOGIN   -> LoginScreen(onNavigateToSignUp = { currentScreen = Screen.SIGNUP })
-        Screen.SIGNUP  -> SignUpScreen(onNavigateToLogin = { currentScreen = Screen.LOGIN })
+
+        Screen.LOGIN -> LoginScreen(
+            onNavigateToSignUp = { currentScreen = Screen.SIGNUP },
+            onLoginSuccess = { currentScreen = Screen.HOME } // 👈 ADD THIS
+        )
+
+        Screen.SIGNUP  -> SignUpScreen(
+            onNavigateToLogin = { currentScreen = Screen.LOGIN }
+        )
+
+        Screen.HOME -> HomeScreen() // 👈 ADD THIS
     }
 }
 
@@ -175,7 +184,10 @@ fun RetraceTextField(
 
 // ─── Login Screen ─────────────────────────────────────────────────────────────
 @Composable
-fun LoginScreen(onNavigateToSignUp: () -> Unit) {
+fun LoginScreen(
+    onNavigateToSignUp: () -> Unit,
+    onLoginSuccess: () -> Unit
+) {
     val focusManager = LocalFocusManager.current
 
     var email           by remember { mutableStateOf("") }
@@ -316,19 +328,31 @@ fun LoginScreen(onNavigateToSignUp: () -> Unit) {
                     Spacer(modifier = Modifier.height(24.dp))
 
                     // Sign In button
+
                     val auth = FirebaseAuth.getInstance()
+                    var errorMessage by remember { mutableStateOf("") }
+                    if (errorMessage.isNotEmpty()) {
+                        Spacer(modifier = Modifier.height(8.dp))
+                        Text(
+                            text = errorMessage,
+                            color = RetraceError,
+                            fontSize = 13.sp
+                        )
+                    }
                     Button(
                         onClick = {
                             isLoading = true
+                            errorMessage = ""
 
                             auth.signInWithEmailAndPassword(email, password)
                                 .addOnCompleteListener { task ->
+                                    isLoading = false
+
                                     if (task.isSuccessful) {
                                         isLoading = false
-                                        // TODO: Navigate to home
+                                        onLoginSuccess() // 👈 PUT IT HERE
                                     } else {
-                                        isLoading = false
-                                        println("Login failed: ${task.exception?.message}")
+                                        errorMessage = task.exception?.message ?: "Login failed ❌"
                                     }
                                 }
                         },
@@ -621,5 +645,19 @@ fun SignUpScreen(onNavigateToLogin: () -> Unit) {
 
             Spacer(modifier = Modifier.height(32.dp))
         }
+    }
+}
+
+@Composable
+fun HomeScreen() {
+    Box(
+        modifier = Modifier.fillMaxSize(),
+        contentAlignment = Alignment.Center
+    ) {
+        Text(
+            text = "Welcome 🎉 You are logged in!",
+            fontSize = 22.sp,
+            fontWeight = FontWeight.Bold
+        )
     }
 }
