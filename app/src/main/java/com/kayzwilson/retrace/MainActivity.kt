@@ -37,6 +37,8 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import kotlinx.coroutines.delay
 
+import com.google.firebase.firestore.FirebaseFirestore
+
 // ─── Brand Colors ─────────────────────────────────────────────────────────────
 val RetraceNavy    = Color(0xFF1F1A44)
 val RetraceMidBlue = Color(0xFF2B4EA8)
@@ -314,8 +316,22 @@ fun LoginScreen(onNavigateToSignUp: () -> Unit) {
                     Spacer(modifier = Modifier.height(24.dp))
 
                     // Sign In button
+                    val auth = FirebaseAuth.getInstance()
                     Button(
-                        onClick = { isLoading = true /* TODO: authenticate */ },
+                        onClick = {
+                            isLoading = true
+
+                            auth.signInWithEmailAndPassword(email, password)
+                                .addOnCompleteListener { task ->
+                                    if (task.isSuccessful) {
+                                        isLoading = false
+                                        // TODO: Navigate to home
+                                    } else {
+                                        isLoading = false
+                                        println("Login failed: ${task.exception?.message}")
+                                    }
+                                }
+                        },
                         enabled = canSubmit && !isLoading,
                         modifier = Modifier.fillMaxWidth().height(54.dp),
                         shape = RoundedCornerShape(14.dp),
@@ -529,9 +545,40 @@ fun SignUpScreen(onNavigateToLogin: () -> Unit) {
 
                     Spacer(modifier = Modifier.height(28.dp))
 
+                    val auth = FirebaseAuth.getInstance()
+                    val db = FirebaseFirestore.getInstance()
                     // Create Account button
                     Button(
-                        onClick = { isLoading = true /* TODO: register user */ },
+
+                        onClick = {
+                            isLoading = true
+
+                            auth.createUserWithEmailAndPassword(email, password)
+                                .addOnCompleteListener { task ->
+                                    if (task.isSuccessful) {
+
+                                        val userId = auth.currentUser?.uid
+
+                                        val userMap = hashMapOf(
+                                            "studentId" to studentId,
+                                            "email" to email
+                                        )
+
+                                        userId?.let {
+                                            db.collection("users")
+                                                .document(it)
+                                                .set(userMap)
+                                        }
+
+                                        isLoading = false
+                                        // TODO: Navigate to home
+
+                                    } else {
+                                        isLoading = false
+                                        println("Signup failed: ${task.exception?.message}")
+                                    }
+                                }
+                        },
                         enabled = canSubmit && !isLoading,
                         modifier = Modifier.fillMaxWidth().height(54.dp),
                         shape = RoundedCornerShape(14.dp),
