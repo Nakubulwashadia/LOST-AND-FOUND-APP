@@ -11,7 +11,10 @@ import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.text.KeyboardActions
 import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.automirrored.filled.ArrowBack
+import androidx.compose.material.icons.automirrored.filled.KeyboardArrowRight
 import androidx.compose.material.icons.filled.Badge
+import androidx.compose.material.icons.filled.Edit
 import androidx.compose.material.icons.filled.Email
 import androidx.compose.material.icons.filled.Lock
 import androidx.compose.material.icons.filled.Visibility
@@ -74,7 +77,7 @@ fun RetraceApp() {
 
         Screen.LOGIN -> LoginScreen(
             onNavigateToSignUp = { currentScreen = Screen.SIGNUP },
-            onLoginSuccess = { currentScreen = Screen.HOME } // 👈 ADD THIS
+            onLoginSuccess = { currentScreen = Screen.HOME }
         )
 
         Screen.SIGNUP  -> SignUpScreen(
@@ -83,7 +86,7 @@ fun RetraceApp() {
 
         Screen.HOME -> HomeScreen(
             onNavigateToAccount = { currentScreen = Screen.ACCOUNT }
-        )// 👈 ADD THIS
+        )
 
         Screen.ACCOUNT -> AccountScreen(
             onBack = { currentScreen = Screen.HOME }
@@ -207,7 +210,6 @@ fun LoginScreen(
     val canSubmit     = email.isNotEmpty() && password.isNotEmpty() && !emailError && !passwordError
 
     val auth = FirebaseAuth.getInstance()
-    println("Firebase connected: $auth")
     Box(modifier = Modifier.fillMaxSize().background(RetraceLightBg)) {
 
         // Decorative header
@@ -335,12 +337,11 @@ fun LoginScreen(
 
                     // Sign In button
 
-                    val auth = FirebaseAuth.getInstance()
-                    var errorMessage by remember { mutableStateOf("") }
-                    if (errorMessage.isNotEmpty()) {
+                    var loginErrorMessage by remember { mutableStateOf("") }
+                    if (loginErrorMessage.isNotEmpty()) {
                         Spacer(modifier = Modifier.height(8.dp))
                         Text(
-                            text = errorMessage,
+                            text = loginErrorMessage,
                             color = RetraceError,
                             fontSize = 13.sp
                         )
@@ -348,17 +349,16 @@ fun LoginScreen(
                     Button(
                         onClick = {
                             isLoading = true
-                            errorMessage = ""
+                            loginErrorMessage = ""
 
                             auth.signInWithEmailAndPassword(email, password)
                                 .addOnCompleteListener { task ->
                                     isLoading = false
 
                                     if (task.isSuccessful) {
-                                        isLoading = false
-                                        onLoginSuccess() // 👈 PUT IT HERE
+                                        onLoginSuccess()
                                     } else {
-                                        errorMessage = task.exception?.message ?: "Login failed ❌"
+                                        loginErrorMessage = task.exception?.message ?: "Login failed ❌"
                                     }
                                 }
                         },
@@ -385,9 +385,9 @@ fun LoginScreen(
 
                     // Divider
                     Row(modifier = Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
-                        Divider(modifier = Modifier.weight(1f), color = Color(0xFFDDE3F0))
-                        Text("  Don't have an account?  ", fontSize = 12.sp, color = RetraceGrey)
-                        Divider(modifier = Modifier.weight(1f), color = Color(0xFFDDE3F0))
+                        HorizontalDivider(modifier = Modifier.weight(1f), color = Color(0xFFDDE3F0))
+                        Text("  Don\u0027t have an account?  ", fontSize = 12.sp, color = RetraceGrey)
+                        HorizontalDivider(modifier = Modifier.weight(1f), color = Color(0xFFDDE3F0))
                     }
 
                     Spacer(modifier = Modifier.height(20.dp))
@@ -466,7 +466,7 @@ fun SignUpScreen(onNavigateToLogin: () -> Unit) {
             Text("RETRACE", fontSize = 26.sp, fontWeight = FontWeight.ExtraBold,
                 color = RetraceWhite, letterSpacing = 4.sp)
             Spacer(modifier = Modifier.height(4.dp))
-            Text("Find what's lost. Return what matters.",
+            Text("Find what\u0027s lost. Return what matters.",
                 fontSize = 13.sp, color = RetraceWhite.copy(alpha = 0.75f),
                 textAlign = TextAlign.Center)
 
@@ -637,14 +637,14 @@ fun SignUpScreen(onNavigateToLogin: () -> Unit) {
                             .clickable { onNavigateToLogin() },
                         verticalAlignment = Alignment.CenterVertically
                     ) {
-                        Divider(modifier = Modifier.weight(1f), color = Color(0xFFDDE3F0))
+                        HorizontalDivider(modifier = Modifier.weight(1f), color = Color(0xFFDDE3F0))
                         Text(
                             "  Already have an account? Sign In  ",
                             fontSize = 12.sp,
                             color = RetraceMidBlue,
                             fontWeight = FontWeight.SemiBold
                         )
-                        Divider(modifier = Modifier.weight(1f), color = Color(0xFFDDE3F0))
+                        HorizontalDivider(modifier = Modifier.weight(1f), color = Color(0xFFDDE3F0))
                     }
                 }
             }
@@ -858,9 +858,9 @@ fun LostItemCard(
     }
 }
 
+@OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun AccountScreen(onBack: () -> Unit) {
-
     var isEditing by remember { mutableStateOf(false) }
 
     var name by remember { mutableStateOf("John Doe") }
@@ -868,153 +868,538 @@ fun AccountScreen(onBack: () -> Unit) {
     var email by remember { mutableStateOf("john.doe@university.edu") }
     var phone by remember { mutableStateOf("+256 700 000000") }
     var studentId by remember { mutableStateOf("STU-2024-12345") }
-    var department by remember { mutableStateOf("Computer Science") }
+    var department by remember { mutableStateOf("Computer Science & Engineering") }
     var year by remember { mutableStateOf("3rd Year • 2nd Semester") }
+    var semester by remember { mutableStateOf("Spring 2026") }
+    var gpa by remember { mutableStateOf("3.67") }
     var residence by remember { mutableStateOf("University Hall, Room 204") }
+    var lostCount by remember { mutableIntStateOf(3) }
+    var foundCount by remember { mutableIntStateOf(2) }
+    var reportsCount by remember { mutableIntStateOf(12) }
 
-    Column(
-        modifier = Modifier
-            .fillMaxSize()
-            .background(Color(0xFFF8FAFC))
-    ) {
-
-        // 🔷 Header
-        Row(
-            modifier = Modifier
-                .fillMaxWidth()
-                .background(Color.White)
-                .padding(16.dp),
-            verticalAlignment = Alignment.CenterVertically
-        ) {
-            Text(
-                "←",
-                fontSize = 22.sp,
-                color = Color(0xFF2C7DA0),
-                modifier = Modifier
-                    .clickable { onBack() }
-                    .padding(end = 12.dp)
-            )
-
-            Text(
-                "My Account",
-                fontSize = 20.sp,
-                fontWeight = FontWeight.Bold
+    Scaffold(
+        containerColor = Color(0xFFF8FAFC),
+        topBar = {
+            TopAppBar(
+                title = {
+                    Text(
+                        "My Account",
+                        fontSize = 20.sp,
+                        fontWeight = FontWeight.SemiBold,
+                        color = Color(0xFF0F3B5C)
+                    )
+                },
+                navigationIcon = {
+                    IconButton(onClick = onBack) {
+                        Icon(
+                            Icons.AutoMirrored.Filled.ArrowBack,
+                            contentDescription = "Back",
+                            tint = Color(0xFF2C7DA0)
+                        )
+                    }
+                },
+                colors = TopAppBarDefaults.topAppBarColors(
+                    containerColor = Color.White,
+                    scrolledContainerColor = Color.White
+                )
             )
         }
-
+    ) { paddingValues ->
         Column(
             modifier = Modifier
+                .fillMaxSize()
+                .background(Color(0xFFF8FAFC))
                 .verticalScroll(rememberScrollState())
-                .padding(16.dp)
+                .padding(paddingValues)
+                .padding(horizontal = 16.dp)
+                .padding(bottom = 24.dp)
         ) {
-
-            // 🔷 Profile Card
+            // Profile Header Card
             Card(
-                shape = RoundedCornerShape(20.dp),
+                shape = RoundedCornerShape(24.dp),
+                colors = CardDefaults.cardColors(containerColor = Color.White),
+                elevation = CardDefaults.cardElevation(defaultElevation = 0.dp),
                 modifier = Modifier.fillMaxWidth()
             ) {
                 Column(
-                    modifier = Modifier.padding(20.dp),
+                    modifier = Modifier.padding(24.dp),
                     horizontalAlignment = Alignment.CenterHorizontally
                 ) {
-
-                    // Avatar
+                    // Avatar with gradient background
                     Box(
                         modifier = Modifier
-                            .size(90.dp)
-                            .background(Color(0xFF2C7DA0), CircleShape),
+                            .size(100.dp)
+                            .background(
+                                brush = Brush.linearGradient(
+                                    colors = listOf(Color(0xFF2C7DA0), Color(0xFF1F5068))
+                                ),
+                                shape = CircleShape
+                            )
+                            .clickable(enabled = !isEditing) { if (!isEditing) isEditing = true },
                         contentAlignment = Alignment.Center
                     ) {
                         Text(
-                            name.take(2).uppercase(),
+                            text = name.split(" ")
+                                .filter { it.isNotEmpty() }
+                                .take(2)
+                                .joinToString("") { it.first().uppercase() },
                             color = Color.White,
-                            fontSize = 24.sp,
+                            fontSize = 32.sp,
                             fontWeight = FontWeight.Bold
                         )
+
+                        if (!isEditing) {
+                            Box(
+                                modifier = Modifier
+                                    .align(Alignment.BottomEnd)
+                                    .size(32.dp)
+                                    .background(Color.White, CircleShape)
+                                    .border(2.dp, Color(0xFFE2E8F0), CircleShape),
+                                contentAlignment = Alignment.Center
+                            ) {
+                                Icon(
+                                    Icons.Default.Edit,
+                                    contentDescription = "Edit",
+                                    modifier = Modifier.size(16.dp),
+                                    tint = Color(0xFF2C7DA0)
+                                )
+                            }
+                        }
                     }
 
-                    Spacer(modifier = Modifier.height(12.dp))
+                    Spacer(modifier = Modifier.height(16.dp))
 
                     if (!isEditing) {
-                        Text(name, fontSize = 20.sp, fontWeight = FontWeight.Bold)
-                        Text(role, color = Color.Gray)
+                        Text(
+                            text = name,
+                            fontSize = 24.sp,
+                            fontWeight = FontWeight.Bold,
+                            color = Color(0xFF0F3B5C)
+                        )
 
-                        Spacer(modifier = Modifier.height(10.dp))
+                        Spacer(modifier = Modifier.height(4.dp))
 
-                        OutlinedButton(onClick = { isEditing = true }) {
-                            Text("Edit Profile")
+                        Text(
+                            text = role,
+                            fontSize = 14.sp,
+                            color = Color(0xFF5B6E8C)
+                        )
+
+                        Spacer(modifier = Modifier.height(16.dp))
+
+                        Button(
+                            onClick = { isEditing = true },
+                            colors = ButtonDefaults.buttonColors(
+                                containerColor = Color.White,
+                                contentColor = Color(0xFF2C7DA0)
+                            ),
+                            shape = RoundedCornerShape(44.dp),
+                            border = BorderStroke(1.dp, Color(0xFF2C7DA0)),
+                            modifier = Modifier.width(150.dp)
+                        ) {
+                            Icon(
+                                Icons.Default.Edit,
+                                contentDescription = null,
+                                modifier = Modifier.size(16.dp)
+                            )
+                            Spacer(modifier = Modifier.width(8.dp))
+                            Text("Edit Profile", fontSize = 14.sp)
                         }
                     } else {
-                        OutlinedTextField(value = name, onValueChange = { name = it }, label = { Text("Name") })
-                        OutlinedTextField(value = role, onValueChange = { role = it }, label = { Text("Role") })
+                        // Edit mode name and role
+                        OutlinedTextField(
+                            value = name,
+                            onValueChange = { name = it },
+                            label = { Text("Full Name", color = Color(0xFF5B6E8C)) },
+                            colors = OutlinedTextFieldDefaults.colors(
+                                focusedBorderColor = Color(0xFF2C7DA0),
+                                unfocusedBorderColor = Color(0xFFE2E8F0),
+                                focusedLabelColor = Color(0xFF2C7DA0)
+                            ),
+                            shape = RoundedCornerShape(12.dp),
+                            modifier = Modifier.fillMaxWidth()
+                        )
+
+                        Spacer(modifier = Modifier.height(12.dp))
+
+                        OutlinedTextField(
+                            value = role,
+                            onValueChange = { role = it },
+                            label = { Text("Role", color = Color(0xFF5B6E8C)) },
+                            colors = OutlinedTextFieldDefaults.colors(
+                                focusedBorderColor = Color(0xFF2C7DA0),
+                                unfocusedBorderColor = Color(0xFFE2E8F0),
+                                focusedLabelColor = Color(0xFF2C7DA0)
+                            ),
+                            shape = RoundedCornerShape(12.dp),
+                            modifier = Modifier.fillMaxWidth()
+                        )
                     }
                 }
             }
 
             Spacer(modifier = Modifier.height(16.dp))
 
-            // 🔷 Info Section
-            Card(shape = RoundedCornerShape(20.dp)) {
-                Column(modifier = Modifier.padding(16.dp)) {
+            // Stats Cards Row
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.spacedBy(12.dp)
+            ) {
+                StatCard(
+                    value = lostCount.toString(),
+                    label = "Lost Items",
+                    icon = "⚠️",
+                    modifier = Modifier.weight(1f)
+                )
+                StatCard(
+                    value = foundCount.toString(),
+                    label = "Found Items",
+                    icon = "✅",
+                    modifier = Modifier.weight(1f)
+                )
+                StatCard(
+                    value = reportsCount.toString(),
+                    label = "Total Reports",
+                    icon = "📊",
+                    modifier = Modifier.weight(1f)
+                )
+            }
 
-                    Text("Personal Info", fontWeight = FontWeight.Bold)
+            Spacer(modifier = Modifier.height(20.dp))
 
-                    Spacer(modifier = Modifier.height(10.dp))
-
-                    if (!isEditing) {
-                        Text("Email: $email")
-                        Text("Phone: $phone")
-                        Text("Student ID: $studentId")
-                    } else {
-                        OutlinedTextField(email, { email = it }, label = { Text("Email") })
-                        OutlinedTextField(phone, { phone = it }, label = { Text("Phone") })
-                        OutlinedTextField(studentId, { studentId = it }, label = { Text("Student ID") })
-                    }
+            // Personal Information Section
+            InfoSectionCard(
+                title = "Personal Information",
+                icon = "👤"
+            ) {
+                if (!isEditing) {
+                    InfoRow(icon = "📧", label = "Email Address", value = email)
+                    InfoRow(icon = "📞", label = "Contact Number", value = phone)
+                    InfoRow(icon = "🎓", label = "Student ID", value = studentId)
+                } else {
+                    OutlinedTextField(
+                        value = email,
+                        onValueChange = { email = it },
+                        label = { Text("Email Address") },
+                        colors = OutlinedTextFieldDefaults.colors(
+                            focusedBorderColor = Color(0xFF2C7DA0),
+                            unfocusedBorderColor = Color(0xFFE2E8F0)
+                        ),
+                        shape = RoundedCornerShape(12.dp),
+                        modifier = Modifier.fillMaxWidth()
+                    )
+                    Spacer(modifier = Modifier.height(12.dp))
+                    OutlinedTextField(
+                        value = phone,
+                        onValueChange = { phone = it },
+                        label = { Text("Contact Number") },
+                        colors = OutlinedTextFieldDefaults.colors(
+                            focusedBorderColor = Color(0xFF2C7DA0),
+                            unfocusedBorderColor = Color(0xFFE2E8F0)
+                        ),
+                        shape = RoundedCornerShape(12.dp),
+                        modifier = Modifier.fillMaxWidth()
+                    )
+                    Spacer(modifier = Modifier.height(12.dp))
+                    OutlinedTextField(
+                        value = studentId,
+                        onValueChange = { studentId = it },
+                        label = { Text("Student ID") },
+                        colors = OutlinedTextFieldDefaults.colors(
+                            focusedBorderColor = Color(0xFF2C7DA0),
+                            unfocusedBorderColor = Color(0xFFE2E8F0)
+                        ),
+                        shape = RoundedCornerShape(12.dp),
+                        modifier = Modifier.fillMaxWidth()
+                    )
                 }
             }
 
             Spacer(modifier = Modifier.height(16.dp))
 
-            Card(shape = RoundedCornerShape(20.dp)) {
-                Column(modifier = Modifier.padding(16.dp)) {
+            // Academic Information Section
+            InfoSectionCard(
+                title = "Academic Information",
+                icon = "📚"
+            ) {
+                if (!isEditing) {
+                    InfoRow(icon = "🏫", label = "Department", value = department)
+                    InfoRow(icon = "📖", label = "Year / Semester", value = "$year • $semester")
+                    InfoRow(icon = "⭐", label = "Current GPA", value = "$gpa / 4.0")
+                    InfoRow(icon = "🏠", label = "Residence", value = residence)
+                } else {
+                    OutlinedTextField(
+                        value = department,
+                        onValueChange = { department = it },
+                        label = { Text("Department") },
+                        colors = OutlinedTextFieldDefaults.colors(
+                            focusedBorderColor = Color(0xFF2C7DA0),
+                            unfocusedBorderColor = Color(0xFFE2E8F0)
+                        ),
+                        shape = RoundedCornerShape(12.dp),
+                        modifier = Modifier.fillMaxWidth()
+                    )
+                    Spacer(modifier = Modifier.height(12.dp))
 
-                    Text("Academic Info", fontWeight = FontWeight.Bold)
-
-                    Spacer(modifier = Modifier.height(10.dp))
-
-                    if (!isEditing) {
-                        Text("Department: $department")
-                        Text("Year: $year")
-                        Text("Residence: $residence")
-                    } else {
-                        OutlinedTextField(department, { department = it }, label = { Text("Department") })
-                        OutlinedTextField(year, { year = it }, label = { Text("Year") })
-                        OutlinedTextField(residence, { residence = it }, label = { Text("Residence") })
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        horizontalArrangement = Arrangement.spacedBy(12.dp)
+                    ) {
+                        OutlinedTextField(
+                            value = year,
+                            onValueChange = { year = it },
+                            label = { Text("Year") },
+                            colors = OutlinedTextFieldDefaults.colors(
+                                focusedBorderColor = Color(0xFF2C7DA0),
+                                unfocusedBorderColor = Color(0xFFE2E8F0)
+                            ),
+                            shape = RoundedCornerShape(12.dp),
+                            modifier = Modifier.weight(1f)
+                        )
+                        OutlinedTextField(
+                            value = semester,
+                            onValueChange = { semester = it },
+                            label = { Text("Semester") },
+                            colors = OutlinedTextFieldDefaults.colors(
+                                focusedBorderColor = Color(0xFF2C7DA0),
+                                unfocusedBorderColor = Color(0xFFE2E8F0)
+                            ),
+                            shape = RoundedCornerShape(12.dp),
+                            modifier = Modifier.weight(1f)
+                        )
                     }
+                    Spacer(modifier = Modifier.height(12.dp))
+                    OutlinedTextField(
+                        value = gpa,
+                        onValueChange = { gpa = it },
+                        label = { Text("GPA") },
+                        colors = OutlinedTextFieldDefaults.colors(
+                            focusedBorderColor = Color(0xFF2C7DA0),
+                            unfocusedBorderColor = Color(0xFFE2E8F0)
+                        ),
+                        shape = RoundedCornerShape(12.dp),
+                        modifier = Modifier.fillMaxWidth()
+                    )
+                    Spacer(modifier = Modifier.height(12.dp))
+                    OutlinedTextField(
+                        value = residence,
+                        onValueChange = { residence = it },
+                        label = { Text("Residence") },
+                        colors = OutlinedTextFieldDefaults.colors(
+                            focusedBorderColor = Color(0xFF2C7DA0),
+                            unfocusedBorderColor = Color(0xFFE2E8F0)
+                        ),
+                        shape = RoundedCornerShape(12.dp),
+                        modifier = Modifier.fillMaxWidth()
+                    )
                 }
             }
 
             Spacer(modifier = Modifier.height(16.dp))
 
-            // 🔷 Buttons (Edit Mode)
+            // Account Settings Section (Read-only)
+            InfoSectionCard(
+                title = "Account Settings",
+                icon = "⚙️"
+            ) {
+                SettingsRow(
+                    icon = "🔔",
+                    title = "Notification Preferences",
+                    subtitle = "Email \u0026 Push Notifications"
+                )
+                HorizontalDivider(
+                    color = Color(0xFFF0F2F5),
+                    modifier = Modifier.padding(vertical = 8.dp)
+                )
+                SettingsRow(
+                    icon = "🔒",
+                    title = "Privacy \u0026 Security",
+                    subtitle = "Two-factor authentication off"
+                )
+                HorizontalDivider(
+                    color = Color(0xFFF0F2F5),
+                    modifier = Modifier.padding(vertical = 8.dp)
+                )
+                SettingsRow(
+                    icon = "🌙",
+                    title = "Dark Mode",
+                    subtitle = "System default"
+                )
+            }
+
+            // Edit Mode Action Buttons
             if (isEditing) {
-                Row(horizontalArrangement = Arrangement.spacedBy(10.dp)) {
+                Spacer(modifier = Modifier.height(24.dp))
 
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.spacedBy(12.dp)
+                ) {
                     Button(
                         onClick = { isEditing = false },
-                        modifier = Modifier.weight(1f)
+                        modifier = Modifier.weight(1f),
+                        colors = ButtonDefaults.buttonColors(
+                            containerColor = Color(0xFF2C7DA0),
+                            contentColor = Color.White
+                        ),
+                        shape = RoundedCornerShape(44.dp)
                     ) {
-                        Text("Save")
+                        Text("Save Changes", fontSize = 15.sp, fontWeight = FontWeight.SemiBold)
                     }
 
                     OutlinedButton(
                         onClick = { isEditing = false },
-                        modifier = Modifier.weight(1f)
+                        modifier = Modifier.weight(1f),
+                        colors = ButtonDefaults.outlinedButtonColors(
+                            contentColor = Color(0xFF5B6E8C)
+                        ),
+                        shape = RoundedCornerShape(44.dp),
+                        border = BorderStroke(1.dp, Color(0xFFE2E8F0))
                     ) {
-                        Text("Cancel")
+                        Text("Cancel", fontSize = 15.sp)
                     }
                 }
             }
         }
+    }
+}
+
+@Composable
+fun StatCard(value: String, label: String, icon: String, modifier: Modifier = Modifier) {
+    Card(
+        shape = RoundedCornerShape(16.dp),
+        colors = CardDefaults.cardColors(containerColor = Color.White),
+        elevation = CardDefaults.cardElevation(defaultElevation = 0.dp),
+        modifier = modifier
+    ) {
+        Column(
+            modifier = Modifier.padding(12.dp),
+            horizontalAlignment = Alignment.CenterHorizontally
+        ) {
+            Text(text = icon, fontSize = 24.sp)
+            Spacer(modifier = Modifier.height(4.dp))
+            Text(
+                text = value,
+                fontSize = 24.sp,
+                fontWeight = FontWeight.Bold,
+                color = Color(0xFF2C7DA0)
+            )
+            Text(
+                text = label,
+                fontSize = 11.sp,
+                color = Color(0xFF5B6E8C),
+                fontWeight = FontWeight.Medium
+            )
+        }
+    }
+}
+
+@Composable
+fun InfoSectionCard(
+    title: String,
+    icon: String,
+    content: @Composable () -> Unit
+) {
+    Card(
+        shape = RoundedCornerShape(20.dp),
+        colors = CardDefaults.cardColors(containerColor = Color.White),
+        elevation = CardDefaults.cardElevation(defaultElevation = 0.dp),
+        modifier = Modifier.fillMaxWidth()
+    ) {
+        Column(
+            modifier = Modifier.padding(20.dp)
+        ) {
+            Row(
+                verticalAlignment = Alignment.CenterVertically,
+                modifier = Modifier.padding(bottom = 16.dp)
+            ) {
+                Text(
+                    text = icon,
+                    fontSize = 20.sp
+                )
+                Spacer(modifier = Modifier.width(8.dp))
+                Text(
+                    text = title,
+                    fontSize = 16.sp,
+                    fontWeight = FontWeight.SemiBold,
+                    color = Color(0xFF0F3B5C)
+                )
+            }
+
+            content()
+        }
+    }
+}
+
+@Composable
+fun InfoRow(icon: String, label: String, value: String) {
+    Row(
+        modifier = Modifier
+            .fillMaxWidth()
+            .padding(vertical = 8.dp),
+        verticalAlignment = Alignment.CenterVertically
+    ) {
+        Text(
+            text = icon,
+            fontSize = 18.sp,
+            modifier = Modifier.width(32.dp)
+        )
+
+        Column(
+            modifier = Modifier.weight(1f)
+        ) {
+            Text(
+                text = label,
+                fontSize = 12.sp,
+                color = Color(0xFF8A99B4),
+                fontWeight = FontWeight.Medium
+            )
+            Spacer(modifier = Modifier.height(2.dp))
+            Text(
+                text = value,
+                fontSize = 15.sp,
+                color = Color(0xFF1E293B),
+                fontWeight = FontWeight.Medium
+            )
+        }
+    }
+}
+
+@Composable
+fun SettingsRow(icon: String, title: String, subtitle: String) {
+    Row(
+        modifier = Modifier
+            .fillMaxWidth()
+            .padding(vertical = 4.dp),
+        verticalAlignment = Alignment.CenterVertically
+    ) {
+        Text(
+            text = icon,
+            fontSize = 20.sp,
+            modifier = Modifier.width(36.dp)
+        )
+
+        Column(
+            modifier = Modifier.weight(1f)
+        ) {
+            Text(
+                text = title,
+                fontSize = 14.sp,
+                fontWeight = FontWeight.Medium,
+                color = Color(0xFF1E293B)
+            )
+            Text(
+                text = subtitle,
+                fontSize = 12.sp,
+                color = Color(0xFF8A99B4)
+            )
+        }
+
+        Icon(
+            Icons.AutoMirrored.Filled.KeyboardArrowRight,
+            contentDescription = null,
+            tint = Color(0xFFCBD5E1),
+            modifier = Modifier.size(20.dp)
+        )
     }
 }
