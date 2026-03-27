@@ -50,7 +50,7 @@ val RetraceGrey    = Color(0xFF8A94A6)
 val RetraceError   = Color(0xFFE53935)
 
 // ─── Navigation State ─────────────────────────────────────────────────────────
-enum class Screen { SPLASH, LOGIN, SIGNUP, HOME }
+enum class Screen { SPLASH, LOGIN, SIGNUP, HOME, ACCOUNT }
 
 // ─── Entry Point ──────────────────────────────────────────────────────────────
 class MainActivity : ComponentActivity() {
@@ -81,7 +81,13 @@ fun RetraceApp() {
             onNavigateToLogin = { currentScreen = Screen.LOGIN }
         )
 
-        Screen.HOME -> HomeScreen() // 👈 ADD THIS
+        Screen.HOME -> HomeScreen(
+            onNavigateToAccount = { currentScreen = Screen.ACCOUNT }
+        )// 👈 ADD THIS
+
+        Screen.ACCOUNT -> AccountScreen(
+            onBack = { currentScreen = Screen.HOME }
+        )
     }
 }
 
@@ -649,7 +655,7 @@ fun SignUpScreen(onNavigateToLogin: () -> Unit) {
 }
 
 @Composable
-fun HomeScreen() {
+fun HomeScreen(onNavigateToAccount: () -> Unit) {
 
     Column(
         modifier = Modifier
@@ -738,7 +744,13 @@ fun HomeScreen() {
         ) {
             Text("⚠️ Lost", color = Color(0xFF2C7DA0))
             Text("✅ Found", color = Color.Gray)
-            Text(" Account", color = Color.Gray)
+            Text(
+                "👤 Account",
+                color = Color.Gray,
+                modifier = Modifier.clickable {
+                    onNavigateToAccount()
+                }
+            )
         }
     }
 }
@@ -841,6 +853,167 @@ fun LostItemCard(
                 colors = ButtonDefaults.buttonColors(containerColor = Color(0xFF2C7DA0))
             ) {
                 Text("Contact", color = Color.White)
+            }
+        }
+    }
+}
+
+@Composable
+fun AccountScreen(onBack: () -> Unit) {
+
+    var isEditing by remember { mutableStateOf(false) }
+
+    var name by remember { mutableStateOf("John Doe") }
+    var role by remember { mutableStateOf("Computer Science Student") }
+    var email by remember { mutableStateOf("john.doe@university.edu") }
+    var phone by remember { mutableStateOf("+256 700 000000") }
+    var studentId by remember { mutableStateOf("STU-2024-12345") }
+    var department by remember { mutableStateOf("Computer Science") }
+    var year by remember { mutableStateOf("3rd Year • 2nd Semester") }
+    var residence by remember { mutableStateOf("University Hall, Room 204") }
+
+    Column(
+        modifier = Modifier
+            .fillMaxSize()
+            .background(Color(0xFFF8FAFC))
+    ) {
+
+        // 🔷 Header
+        Row(
+            modifier = Modifier
+                .fillMaxWidth()
+                .background(Color.White)
+                .padding(16.dp),
+            verticalAlignment = Alignment.CenterVertically
+        ) {
+            Text(
+                "←",
+                fontSize = 22.sp,
+                color = Color(0xFF2C7DA0),
+                modifier = Modifier
+                    .clickable { onBack() }
+                    .padding(end = 12.dp)
+            )
+
+            Text(
+                "My Account",
+                fontSize = 20.sp,
+                fontWeight = FontWeight.Bold
+            )
+        }
+
+        Column(
+            modifier = Modifier
+                .verticalScroll(rememberScrollState())
+                .padding(16.dp)
+        ) {
+
+            // 🔷 Profile Card
+            Card(
+                shape = RoundedCornerShape(20.dp),
+                modifier = Modifier.fillMaxWidth()
+            ) {
+                Column(
+                    modifier = Modifier.padding(20.dp),
+                    horizontalAlignment = Alignment.CenterHorizontally
+                ) {
+
+                    // Avatar
+                    Box(
+                        modifier = Modifier
+                            .size(90.dp)
+                            .background(Color(0xFF2C7DA0), CircleShape),
+                        contentAlignment = Alignment.Center
+                    ) {
+                        Text(
+                            name.take(2).uppercase(),
+                            color = Color.White,
+                            fontSize = 24.sp,
+                            fontWeight = FontWeight.Bold
+                        )
+                    }
+
+                    Spacer(modifier = Modifier.height(12.dp))
+
+                    if (!isEditing) {
+                        Text(name, fontSize = 20.sp, fontWeight = FontWeight.Bold)
+                        Text(role, color = Color.Gray)
+
+                        Spacer(modifier = Modifier.height(10.dp))
+
+                        OutlinedButton(onClick = { isEditing = true }) {
+                            Text("Edit Profile")
+                        }
+                    } else {
+                        OutlinedTextField(value = name, onValueChange = { name = it }, label = { Text("Name") })
+                        OutlinedTextField(value = role, onValueChange = { role = it }, label = { Text("Role") })
+                    }
+                }
+            }
+
+            Spacer(modifier = Modifier.height(16.dp))
+
+            // 🔷 Info Section
+            Card(shape = RoundedCornerShape(20.dp)) {
+                Column(modifier = Modifier.padding(16.dp)) {
+
+                    Text("Personal Info", fontWeight = FontWeight.Bold)
+
+                    Spacer(modifier = Modifier.height(10.dp))
+
+                    if (!isEditing) {
+                        Text("Email: $email")
+                        Text("Phone: $phone")
+                        Text("Student ID: $studentId")
+                    } else {
+                        OutlinedTextField(email, { email = it }, label = { Text("Email") })
+                        OutlinedTextField(phone, { phone = it }, label = { Text("Phone") })
+                        OutlinedTextField(studentId, { studentId = it }, label = { Text("Student ID") })
+                    }
+                }
+            }
+
+            Spacer(modifier = Modifier.height(16.dp))
+
+            Card(shape = RoundedCornerShape(20.dp)) {
+                Column(modifier = Modifier.padding(16.dp)) {
+
+                    Text("Academic Info", fontWeight = FontWeight.Bold)
+
+                    Spacer(modifier = Modifier.height(10.dp))
+
+                    if (!isEditing) {
+                        Text("Department: $department")
+                        Text("Year: $year")
+                        Text("Residence: $residence")
+                    } else {
+                        OutlinedTextField(department, { department = it }, label = { Text("Department") })
+                        OutlinedTextField(year, { year = it }, label = { Text("Year") })
+                        OutlinedTextField(residence, { residence = it }, label = { Text("Residence") })
+                    }
+                }
+            }
+
+            Spacer(modifier = Modifier.height(16.dp))
+
+            // 🔷 Buttons (Edit Mode)
+            if (isEditing) {
+                Row(horizontalArrangement = Arrangement.spacedBy(10.dp)) {
+
+                    Button(
+                        onClick = { isEditing = false },
+                        modifier = Modifier.weight(1f)
+                    ) {
+                        Text("Save")
+                    }
+
+                    OutlinedButton(
+                        onClick = { isEditing = false },
+                        modifier = Modifier.weight(1f)
+                    ) {
+                        Text("Cancel")
+                    }
+                }
             }
         }
     }
