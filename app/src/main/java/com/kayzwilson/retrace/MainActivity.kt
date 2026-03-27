@@ -738,6 +738,7 @@ fun HomeScreen() {
         ) {
             Text("⚠️ Lost", color = Color(0xFF2C7DA0))
             Text("✅ Found", color = Color.Gray)
+            Text(" Account", color = Color.Gray)
         }
     }
 }
