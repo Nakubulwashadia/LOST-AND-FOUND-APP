@@ -650,14 +650,197 @@ fun SignUpScreen(onNavigateToLogin: () -> Unit) {
 
 @Composable
 fun HomeScreen() {
-    Box(
-        modifier = Modifier.fillMaxSize(),
-        contentAlignment = Alignment.Center
+
+    Column(
+        modifier = Modifier
+            .fillMaxSize()
+            .background(Color(0xFFF8FAFC))
     ) {
+
+        // 🔷 Header
         Text(
-            text = "Welcome 🎉 You are logged in!",
-            fontSize = 22.sp,
-            fontWeight = FontWeight.Bold
+            text = "Retrace",
+            fontSize = 28.sp,
+            fontWeight = FontWeight.Bold,
+            color = Color(0xFF0F3B5C),
+            modifier = Modifier.padding(16.dp)
         )
+
+        // 🔷 Filter Chips
+        Row(
+            modifier = Modifier
+                .horizontalScroll(rememberScrollState())
+                .padding(horizontal = 12.dp),
+            horizontalArrangement = Arrangement.spacedBy(8.dp)
+        ) {
+            FilterChip("All Lost", true)
+            FilterChip("Electronics", false)
+            FilterChip("Accessories", false)
+            FilterChip("Books", false)
+            FilterChip("ID Cards", false)
+        }
+
+        Spacer(modifier = Modifier.height(12.dp))
+
+        // 🔷 Search Bar
+        var search by remember { mutableStateOf("") }
+
+        OutlinedTextField(
+            value = search,
+            onValueChange = { search = it },
+            placeholder = { Text("Search lost items...") },
+            leadingIcon = { Text("🔍") },
+            shape = RoundedCornerShape(50),
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(horizontal = 16.dp)
+        )
+
+        Spacer(modifier = Modifier.height(12.dp))
+
+        // 🔷 Feed (Scrollable)
+        Column(
+            modifier = Modifier
+                .weight(1f)
+                .verticalScroll(rememberScrollState())
+                .padding(horizontal = 12.dp)
+        ) {
+
+            LostItemCard(
+                name = "Emma Rodriguez",
+                course = "Computer Science • 2nd year",
+                item = "MacBook Pro 14\"",
+                emoji = "💻"
+            )
+
+            LostItemCard(
+                name = "James Chen",
+                course = "Business • 3rd year",
+                item = "AirPods Pro",
+                emoji = "🎧"
+            )
+
+            LostItemCard(
+                name = "Sophia Martinez",
+                course = "Biology • 1st year",
+                item = "Student ID Card",
+                emoji = "🪪"
+            )
+        }
+
+        // 🔷 Bottom Nav
+        Row(
+            modifier = Modifier
+                .fillMaxWidth()
+                .background(Color.White)
+                .padding(16.dp),
+            horizontalArrangement = Arrangement.SpaceEvenly
+        ) {
+            Text("⚠️ Lost", color = Color(0xFF2C7DA0))
+            Text("✅ Found", color = Color.Gray)
+        }
+    }
+}
+
+@Composable
+fun FilterChip(text: String, isActive: Boolean) {
+    Text(
+        text = text,
+        modifier = Modifier
+            .background(
+                if (isActive) Color(0xFF2C7DA0) else Color(0xFFEEF2FF),
+                shape = RoundedCornerShape(50)
+            )
+            .padding(horizontal = 14.dp, vertical = 6.dp),
+        color = if (isActive) Color.White else Color(0xFF1F5068),
+        fontSize = 13.sp
+    )
+}
+
+@Composable
+fun LostItemCard(
+    name: String,
+    course: String,
+    item: String,
+    emoji: String
+) {
+    Card(
+        shape = RoundedCornerShape(20.dp),
+        modifier = Modifier
+            .fillMaxWidth()
+            .padding(vertical = 8.dp),
+        colors = CardDefaults.cardColors(containerColor = Color.White)
+    ) {
+
+        Column {
+
+            // 🔷 Header Row
+            Row(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(12.dp),
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+
+                Box(
+                    modifier = Modifier
+                        .size(40.dp)
+                        .background(Color(0xFF2C7DA0), CircleShape),
+                    contentAlignment = Alignment.Center
+                ) {
+                    Text("👩‍🎓")
+                }
+
+                Spacer(modifier = Modifier.width(10.dp))
+
+                Column(modifier = Modifier.weight(1f)) {
+                    Text(name, fontWeight = FontWeight.Bold)
+                    Text(course, fontSize = 12.sp, color = Color.Gray)
+                }
+
+                Text(
+                    "LOST",
+                    color = Color.Red,
+                    fontSize = 11.sp,
+                    modifier = Modifier
+                        .background(Color(0xFFFEE2E2), RoundedCornerShape(50))
+                        .padding(horizontal = 10.dp, vertical = 4.dp)
+                )
+            }
+
+            // 🔷 Image Placeholder
+            Box(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .height(180.dp)
+                    .background(Color(0xFFE2E8F0)),
+                contentAlignment = Alignment.Center
+            ) {
+                Text(emoji, fontSize = 40.sp)
+            }
+
+            // 🔷 Description
+            Column(modifier = Modifier.padding(12.dp)) {
+                Text(item, fontWeight = FontWeight.Bold, fontSize = 18.sp)
+
+                Spacer(modifier = Modifier.height(6.dp))
+
+                Text("📅 March 25, 2026", fontSize = 13.sp)
+                Text("⏰ 2:30 PM", fontSize = 13.sp)
+                Text("🏫 Engineering Hall", fontSize = 13.sp)
+            }
+
+            // 🔷 Button
+            Button(
+                onClick = { },
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(12.dp),
+                shape = RoundedCornerShape(50),
+                colors = ButtonDefaults.buttonColors(containerColor = Color(0xFF2C7DA0))
+            ) {
+                Text("Contact", color = Color.White)
+            }
+        }
     }
 }
