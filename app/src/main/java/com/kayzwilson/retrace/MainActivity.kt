@@ -705,33 +705,39 @@ fun HomeScreen(onNavigateToAccount: () -> Unit) {
         Spacer(modifier = Modifier.height(12.dp))
 
         // 🔷 Feed (Scrollable)
-        Column(
+        LazyColumn(
             modifier = Modifier
                 .weight(1f)
-                .verticalScroll(rememberScrollState())
                 .padding(horizontal = 12.dp)
-        ) {
+        )
+        {
 
-            LostItemCard(
-                name = "Emma Rodriguez",
-                course = "Computer Science • 2nd year",
-                item = "MacBook Pro 14\"",
-                emoji = "💻"
-            )
+            item {
+                LostItemCard(
+                    name = "Emma Rodriguez",
+                    course = "Computer Science • 2nd year",
+                    item = "MacBook Pro 14\"",
+                    emoji = "💻"
+                )
+            }
 
-            LostItemCard(
-                name = "James Chen",
-                course = "Business • 3rd year",
-                item = "AirPods Pro",
-                emoji = "🎧"
-            )
+            item {
+                LostItemCard(
+                    name = "James Chen",
+                    course = "Business • 3rd year",
+                    item = "AirPods Pro",
+                    emoji = "🎧"
+                )
+            }
 
-            LostItemCard(
-                name = "Sophia Martinez",
-                course = "Biology • 1st year",
-                item = "Student ID Card",
-                emoji = "🪪"
-            )
+            item {
+                LostItemCard(
+                    name = "Sophia Martinez",
+                    course = "Biology • 1st year",
+                    item = "Student ID Card",
+                    emoji = "🪪"
+                )
+            }
         }
 
         // 🔷 Bottom Nav
