@@ -6,6 +6,7 @@ import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
 import androidx.compose.foundation.*
 import androidx.compose.foundation.layout.*
+import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.text.KeyboardActions
@@ -81,7 +82,8 @@ fun RetraceApp() {
         )
 
         Screen.SIGNUP  -> SignUpScreen(
-            onNavigateToLogin = { currentScreen = Screen.LOGIN }
+            onNavigateToLogin = { currentScreen = Screen.LOGIN },
+            onSignUpSuccess = { currentScreen = Screen.HOME }
         )
 
         Screen.HOME -> HomeScreen(
@@ -120,33 +122,39 @@ fun SplashScreen() {
 
 // ─── Shared Header Block ──────────────────────────────────────────────────────
 @Composable
-fun RetraceScreenHeader(subtitle: String) {
-    // Gradient background
+fun RetraceScreenHeader() {
     Box(
         modifier = Modifier
             .fillMaxWidth()
             .height(260.dp)
-            .background(
-                Brush.verticalGradient(
-                    colors = listOf(RetraceNavy, RetraceMidBlue, RetraceLightBg)
+    ) {
+        // Gradient background
+        Box(
+            modifier = Modifier
+                .fillMaxSize()
+                .background(
+                    Brush.verticalGradient(
+                        colors = listOf(RetraceNavy, RetraceMidBlue, RetraceLightBg)
+                    )
                 )
-            )
-    )
-    // Decorative circles
-    Box(
-        modifier = Modifier
-            .size(180.dp)
-            .offset(x = (-50).dp, y = (-40).dp)
-            .clip(CircleShape)
-            .background(RetraceAccent.copy(alpha = 0.15f))
-    )
-    Box(
-        modifier = Modifier
-            .size(120.dp)
-            .offset(x = 40.dp, y = 20.dp)
-            .clip(CircleShape)
-            .background(RetraceSkyBlue.copy(alpha = 0.18f))
-    )
+        )
+        // Decorative circles
+        Box(
+            modifier = Modifier
+                .size(180.dp)
+                .offset(x = (-50).dp, y = (-40).dp)
+                .clip(CircleShape)
+                .background(RetraceAccent.copy(alpha = 0.15f))
+        )
+        Box(
+            modifier = Modifier
+                .size(120.dp)
+                .align(Alignment.TopEnd)
+                .offset(x = 40.dp, y = 20.dp)
+                .clip(CircleShape)
+                .background(RetraceSkyBlue.copy(alpha = 0.18f))
+        )
+    }
 }
 
 // ─── Shared Text Field ────────────────────────────────────────────────────────
@@ -212,20 +220,7 @@ fun LoginScreen(
     val auth = FirebaseAuth.getInstance()
     Box(modifier = Modifier.fillMaxSize().background(RetraceLightBg)) {
 
-        // Decorative header
-        Box(
-            modifier = Modifier.fillMaxWidth().height(260.dp).background(
-                Brush.verticalGradient(colors = listOf(RetraceNavy, RetraceMidBlue, RetraceLightBg))
-            )
-        )
-        Box(
-            modifier = Modifier.size(180.dp).offset(x = (-50).dp, y = (-40).dp)
-                .clip(CircleShape).background(RetraceAccent.copy(alpha = 0.15f))
-        )
-        Box(
-            modifier = Modifier.size(120.dp).align(Alignment.TopEnd).offset(x = 40.dp, y = 20.dp)
-                .clip(CircleShape).background(RetraceSkyBlue.copy(alpha = 0.18f))
-        )
+        RetraceScreenHeader()
 
         Column(
             modifier = Modifier.fillMaxSize().verticalScroll(rememberScrollState())
@@ -412,7 +407,10 @@ fun LoginScreen(
 
 // ─── Sign Up Screen ───────────────────────────────────────────────────────────
 @Composable
-fun SignUpScreen(onNavigateToLogin: () -> Unit) {
+fun SignUpScreen(
+    onNavigateToLogin: () -> Unit,
+    onSignUpSuccess: () -> Unit
+) {
     val focusManager = LocalFocusManager.current
 
     var studentId       by remember { mutableStateOf("") }
@@ -434,20 +432,7 @@ fun SignUpScreen(onNavigateToLogin: () -> Unit) {
 
     Box(modifier = Modifier.fillMaxSize().background(RetraceLightBg)) {
 
-        // Decorative header
-        Box(
-            modifier = Modifier.fillMaxWidth().height(260.dp).background(
-                Brush.verticalGradient(colors = listOf(RetraceNavy, RetraceMidBlue, RetraceLightBg))
-            )
-        )
-        Box(
-            modifier = Modifier.size(180.dp).offset(x = (-50).dp, y = (-40).dp)
-                .clip(CircleShape).background(RetraceAccent.copy(alpha = 0.15f))
-        )
-        Box(
-            modifier = Modifier.size(120.dp).align(Alignment.TopEnd).offset(x = 40.dp, y = 20.dp)
-                .clip(CircleShape).background(RetraceSkyBlue.copy(alpha = 0.18f))
-        )
+        RetraceScreenHeader()
 
         Column(
             modifier = Modifier.fillMaxSize().verticalScroll(rememberScrollState())
@@ -601,7 +586,7 @@ fun SignUpScreen(onNavigateToLogin: () -> Unit) {
                                         }
 
                                         isLoading = false
-                                        // TODO: Navigate to home
+                                        onSignUpSuccess()
 
                                     } else {
                                         isLoading = false
@@ -925,16 +910,20 @@ fun AccountScreen(onBack: () -> Unit) {
                 shape = RoundedCornerShape(24.dp),
                 colors = CardDefaults.cardColors(containerColor = Color.White),
                 elevation = CardDefaults.cardElevation(defaultElevation = 0.dp),
-                modifier = Modifier.fillMaxWidth()
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(horizontal = 2.dp) // 👈 balances it visually
             ) {
                 Column(
-                    modifier = Modifier.padding(24.dp),
+                    modifier = Modifier.padding(24.dp) .fillMaxWidth(),
+
                     horizontalAlignment = Alignment.CenterHorizontally
                 ) {
                     // Avatar with gradient background
                     Box(
                         modifier = Modifier
                             .size(100.dp)
+                            .align(Alignment.CenterHorizontally)
                             .background(
                                 brush = Brush.linearGradient(
                                     colors = listOf(Color(0xFF2C7DA0), Color(0xFF1F5068))
