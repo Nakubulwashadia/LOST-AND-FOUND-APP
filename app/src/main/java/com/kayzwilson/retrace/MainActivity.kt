@@ -576,7 +576,9 @@ fun SignUpScreen(
 
                                         val userMap = hashMapOf(
                                             "studentId" to studentId,
-                                            "email" to email
+                                            "email" to email,
+                                            "name" to "",        // 👈 add these
+                                            "role" to "Student"  // 👈 default value
                                         )
 
                                         userId?.let {
@@ -854,9 +856,17 @@ fun LostItemCard(
 fun AccountScreen(onBack: () -> Unit) {
     var isEditing by remember { mutableStateOf(false) }
 
-    var name by remember { mutableStateOf("John Doe") }
-    var role by remember { mutableStateOf("Computer Science Student") }
-    var email by remember { mutableStateOf("john.doe@university.edu") }
+    var name by remember { mutableStateOf("") }
+    var role by remember { mutableStateOf("") }
+    var email by remember { mutableStateOf("") }
+
+    var isSaving by remember { mutableStateOf(false) }
+    var saveMessage by remember { mutableStateOf("") }
+    val auth = FirebaseAuth.getInstance()
+    val db = FirebaseFirestore.getInstance()
+    val userId = auth.currentUser?.uid
+
+
     var phone by remember { mutableStateOf("+256 700 000000") }
     var studentId by remember { mutableStateOf("STU-2024-12345") }
     var department by remember { mutableStateOf("Computer Science & Engineering") }
@@ -867,6 +877,24 @@ fun AccountScreen(onBack: () -> Unit) {
     var lostCount by remember { mutableIntStateOf(3) }
     var foundCount by remember { mutableIntStateOf(2) }
     var reportsCount by remember { mutableIntStateOf(12) }
+
+    LaunchedEffect(userId) {
+        userId?.let {
+            db.collection("users").document(it).get()
+                .addOnSuccessListener { doc ->
+                    name = doc.getString("name") ?: "John Doe"
+                    role = doc.getString("role") ?: "Student"
+                    email = doc.getString("email") ?: ""
+                    phone = doc.getString("phone") ?: ""
+                    studentId = doc.getString("studentId") ?: ""
+                    department = doc.getString("department") ?: ""
+                    year = doc.getString("year") ?: ""
+                    semester = doc.getString("semester") ?: ""
+                    gpa = doc.getString("gpa") ?: ""
+                    residence = doc.getString("residence") ?: ""
+                }
+        }
+    }
 
     Scaffold(
         containerColor = Color(0xFFF8FAFC),
@@ -930,7 +958,12 @@ fun AccountScreen(onBack: () -> Unit) {
                                 ),
                                 shape = CircleShape
                             )
-                            .clickable(enabled = !isEditing) { if (!isEditing) isEditing = true },
+                            .clickable(enabled = !isEditing) {
+                                if (!isEditing) {
+                                    isEditing = true
+                                    saveMessage = ""  // 👈 clear old message
+                                }
+                            },
                         contentAlignment = Alignment.Center
                     ) {
                         Text(
@@ -961,6 +994,18 @@ fun AccountScreen(onBack: () -> Unit) {
                             }
                         }
                     }
+                    // After the Card closing brace, before Spacer(height(16.dp))
+                    if (saveMessage.isNotEmpty()) {
+                        Text(
+                            text = saveMessage,
+                            color = if (saveMessage.startsWith("✅")) Color(0xFF2C7DA0) else Color.Red,
+                            fontSize = 13.sp,
+                            textAlign = TextAlign.Center,
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .padding(top = 8.dp)
+                        )
+                    }
 
                     Spacer(modifier = Modifier.height(16.dp))
 
@@ -982,24 +1027,7 @@ fun AccountScreen(onBack: () -> Unit) {
 
                         Spacer(modifier = Modifier.height(16.dp))
 
-                        Button(
-                            onClick = { isEditing = true },
-                            colors = ButtonDefaults.buttonColors(
-                                containerColor = Color.White,
-                                contentColor = Color(0xFF2C7DA0)
-                            ),
-                            shape = RoundedCornerShape(44.dp),
-                            border = BorderStroke(1.dp, Color(0xFF2C7DA0)),
-                            modifier = Modifier.width(150.dp)
-                        ) {
-                            Icon(
-                                Icons.Default.Edit,
-                                contentDescription = null,
-                                modifier = Modifier.size(16.dp)
-                            )
-                            Spacer(modifier = Modifier.width(8.dp))
-                            Text("Edit Profile", fontSize = 14.sp)
-                        }
+
                     } else {
                         // Edit mode name and role
                         OutlinedTextField(
@@ -1029,6 +1057,54 @@ fun AccountScreen(onBack: () -> Unit) {
                             shape = RoundedCornerShape(12.dp),
                             modifier = Modifier.fillMaxWidth()
                         )
+
+                        Spacer(modifier = Modifier.height(16.dp))
+
+
+
+                        Button(
+                            onClick = {
+                                isSaving = true
+                                saveMessage = ""
+                                userId?.let {
+                                    val updates = mapOf(
+                                        "name" to name,
+                                        "role" to role
+                                    )
+                                    db.collection("users").document(it)
+                                        .update(updates)
+                                        .addOnSuccessListener {
+                                            isSaving = false
+                                            saveMessage = "✅ Profile updated!"
+                                            isEditing = false
+                                        }
+                                        .addOnFailureListener { e ->
+                                            isSaving = false
+                                            saveMessage = "❌ ${e.message}"
+                                        }
+                                }
+                            },
+                            enabled = !isSaving && name.isNotBlank(),
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .height(50.dp),
+                            shape = RoundedCornerShape(44.dp),
+                            colors = ButtonDefaults.buttonColors(
+                                containerColor = Color(0xFF2C7DA0),
+                                contentColor = Color.White,
+                                disabledContainerColor = Color(0xFF2C7DA0).copy(alpha = 0.4f)
+                            )
+                        ) {
+                            if (isSaving) {
+                                CircularProgressIndicator(
+                                    modifier = Modifier.size(20.dp),
+                                    color = Color.White,
+                                    strokeWidth = 2.dp
+                                )
+                            } else {
+                                Text("Update Profile", fontWeight = FontWeight.SemiBold)
+                            }
+                        }
                     }
                 }
             }
@@ -1223,36 +1299,20 @@ fun AccountScreen(onBack: () -> Unit) {
             }
 
             // Edit Mode Action Buttons
+            // ✅ REPLACE WITH THIS
             if (isEditing) {
                 Spacer(modifier = Modifier.height(24.dp))
 
-                Row(
+                OutlinedButton(
+                    onClick = { isEditing = false },
                     modifier = Modifier.fillMaxWidth(),
-                    horizontalArrangement = Arrangement.spacedBy(12.dp)
+                    colors = ButtonDefaults.outlinedButtonColors(
+                        contentColor = Color(0xFF5B6E8C)
+                    ),
+                    shape = RoundedCornerShape(44.dp),
+                    border = BorderStroke(1.dp, Color(0xFFE2E8F0))
                 ) {
-                    Button(
-                        onClick = { isEditing = false },
-                        modifier = Modifier.weight(1f),
-                        colors = ButtonDefaults.buttonColors(
-                            containerColor = Color(0xFF2C7DA0),
-                            contentColor = Color.White
-                        ),
-                        shape = RoundedCornerShape(44.dp)
-                    ) {
-                        Text("Save Changes", fontSize = 15.sp, fontWeight = FontWeight.SemiBold)
-                    }
-
-                    OutlinedButton(
-                        onClick = { isEditing = false },
-                        modifier = Modifier.weight(1f),
-                        colors = ButtonDefaults.outlinedButtonColors(
-                            contentColor = Color(0xFF5B6E8C)
-                        ),
-                        shape = RoundedCornerShape(44.dp),
-                        border = BorderStroke(1.dp, Color(0xFFE2E8F0))
-                    ) {
-                        Text("Cancel", fontSize = 15.sp)
-                    }
+                    Text("Cancel", fontSize = 15.sp)
                 }
             }
         }
