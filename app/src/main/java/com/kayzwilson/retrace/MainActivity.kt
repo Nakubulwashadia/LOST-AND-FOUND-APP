@@ -872,14 +872,17 @@ fun AccountScreen(onBack: () -> Unit) {
     var department by remember { mutableStateOf("Computer Science & Engineering") }
     var year by remember { mutableStateOf("3rd Year • 2nd Semester") }
     var semester by remember { mutableStateOf("Spring 2026") }
-    var gpa by remember { mutableStateOf("3.67") }
-    var residence by remember { mutableStateOf("University Hall, Room 204") }
+    var college by remember { mutableStateOf("") }
+    var school by remember { mutableStateOf("") }
     var lostCount by remember { mutableIntStateOf(3) }
     var foundCount by remember { mutableIntStateOf(2) }
     var reportsCount by remember { mutableIntStateOf(12) }
 
     var isSavingPersonal by remember { mutableStateOf(false) }
     var savePersonalMessage by remember { mutableStateOf("") }
+
+    var isSavingAcademic by remember { mutableStateOf(false) }
+    var saveAcademicMessage by remember { mutableStateOf("") }
 
     LaunchedEffect(userId) {
         userId?.let { uid ->
@@ -898,8 +901,8 @@ fun AccountScreen(onBack: () -> Unit) {
                         department = doc.getString("department") ?: ""
                         year = doc.getString("year") ?: ""
                         semester = doc.getString("semester") ?: ""
-                        gpa = doc.getString("gpa") ?: ""
-                        residence = doc.getString("residence") ?: ""
+                        college = doc.getString("college") ?: ""
+                        school = doc.getString("school") ?: ""
                     }
                 }
         }
@@ -1147,7 +1150,7 @@ fun AccountScreen(onBack: () -> Unit) {
 
             Spacer(modifier = Modifier.height(20.dp))
 
-            // Personal Information Section
+
             // Personal Information Section
             InfoSectionCard(
                 title = "Personal Information",
@@ -1266,21 +1269,22 @@ fun AccountScreen(onBack: () -> Unit) {
 
             Spacer(modifier = Modifier.height(16.dp))
 
-            // Academic Information Section
             InfoSectionCard(
                 title = "Academic Information",
                 icon = "📚"
             ) {
                 if (!isEditing) {
-                    InfoRow(icon = "🏫", label = "Department", value = department)
-                    InfoRow(icon = "📖", label = "Year / Semester", value = "$year • $semester")
-                    InfoRow(icon = "⭐", label = "Current GPA", value = "$gpa / 4.0")
-                    InfoRow(icon = "🏠", label = "Residence", value = residence)
+                    InfoRow(icon = "🏛️", label = "College", value = if (college.isEmpty()) "Not set" else college)
+                    InfoRow(icon = "🏫", label = "School", value = if (school.isEmpty()) "Not set" else school)
+                    InfoRow(icon = "📂", label = "Department", value = if (department.isEmpty()) "Not set" else department)
+                    InfoRow(icon = "📖", label = "Year / Semester", value = if (year.isEmpty() && semester.isEmpty()) "Not set" else "$year • $semester")
                 } else {
+                    // College
                     OutlinedTextField(
-                        value = department,
-                        onValueChange = { department = it },
-                        label = { Text("Department") },
+                        value = college,
+                        onValueChange = { college = it },
+                        label = { Text("College") },
+                        placeholder = { Text("e.g. College of Engineering") },
                         colors = OutlinedTextFieldDefaults.colors(
                             focusedBorderColor = Color(0xFF2C7DA0),
                             unfocusedBorderColor = Color(0xFFE2E8F0)
@@ -1288,8 +1292,42 @@ fun AccountScreen(onBack: () -> Unit) {
                         shape = RoundedCornerShape(12.dp),
                         modifier = Modifier.fillMaxWidth()
                     )
+
                     Spacer(modifier = Modifier.height(12.dp))
 
+                    // School
+                    OutlinedTextField(
+                        value = school,
+                        onValueChange = { school = it },
+                        label = { Text("School") },
+                        placeholder = { Text("e.g. School of Computing") },
+                        colors = OutlinedTextFieldDefaults.colors(
+                            focusedBorderColor = Color(0xFF2C7DA0),
+                            unfocusedBorderColor = Color(0xFFE2E8F0)
+                        ),
+                        shape = RoundedCornerShape(12.dp),
+                        modifier = Modifier.fillMaxWidth()
+                    )
+
+                    Spacer(modifier = Modifier.height(12.dp))
+
+                    // Department
+                    OutlinedTextField(
+                        value = department,
+                        onValueChange = { department = it },
+                        label = { Text("Department") },
+                        placeholder = { Text("e.g. Computer Science") },
+                        colors = OutlinedTextFieldDefaults.colors(
+                            focusedBorderColor = Color(0xFF2C7DA0),
+                            unfocusedBorderColor = Color(0xFFE2E8F0)
+                        ),
+                        shape = RoundedCornerShape(12.dp),
+                        modifier = Modifier.fillMaxWidth()
+                    )
+
+                    Spacer(modifier = Modifier.height(12.dp))
+
+                    // Year & Semester side by side
                     Row(
                         modifier = Modifier.fillMaxWidth(),
                         horizontalArrangement = Arrangement.spacedBy(12.dp)
@@ -1298,6 +1336,7 @@ fun AccountScreen(onBack: () -> Unit) {
                             value = year,
                             onValueChange = { year = it },
                             label = { Text("Year") },
+                            placeholder = { Text("e.g. 3rd") },
                             colors = OutlinedTextFieldDefaults.colors(
                                 focusedBorderColor = Color(0xFF2C7DA0),
                                 unfocusedBorderColor = Color(0xFFE2E8F0)
@@ -1309,6 +1348,7 @@ fun AccountScreen(onBack: () -> Unit) {
                             value = semester,
                             onValueChange = { semester = it },
                             label = { Text("Semester") },
+                            placeholder = { Text("e.g. 2") },
                             colors = OutlinedTextFieldDefaults.colors(
                                 focusedBorderColor = Color(0xFF2C7DA0),
                                 unfocusedBorderColor = Color(0xFFE2E8F0)
@@ -1317,30 +1357,65 @@ fun AccountScreen(onBack: () -> Unit) {
                             modifier = Modifier.weight(1f)
                         )
                     }
-                    Spacer(modifier = Modifier.height(12.dp))
-                    OutlinedTextField(
-                        value = gpa,
-                        onValueChange = { gpa = it },
-                        label = { Text("GPA") },
-                        colors = OutlinedTextFieldDefaults.colors(
-                            focusedBorderColor = Color(0xFF2C7DA0),
-                            unfocusedBorderColor = Color(0xFFE2E8F0)
-                        ),
-                        shape = RoundedCornerShape(12.dp),
-                        modifier = Modifier.fillMaxWidth()
-                    )
-                    Spacer(modifier = Modifier.height(12.dp))
-                    OutlinedTextField(
-                        value = residence,
-                        onValueChange = { residence = it },
-                        label = { Text("Residence") },
-                        colors = OutlinedTextFieldDefaults.colors(
-                            focusedBorderColor = Color(0xFF2C7DA0),
-                            unfocusedBorderColor = Color(0xFFE2E8F0)
-                        ),
-                        shape = RoundedCornerShape(12.dp),
-                        modifier = Modifier.fillMaxWidth()
-                    )
+
+                    Spacer(modifier = Modifier.height(16.dp))
+
+                    // Feedback message
+                    if (saveAcademicMessage.isNotEmpty()) {
+                        Text(
+                            text = saveAcademicMessage,
+                            color = if (saveAcademicMessage.startsWith("✅")) Color(0xFF2C7DA0) else Color.Red,
+                            fontSize = 13.sp,
+                            modifier = Modifier.padding(bottom = 8.dp)
+                        )
+                    }
+
+                    // Update button
+                    Button(
+                        onClick = {
+                            isSavingAcademic = true
+                            saveAcademicMessage = ""
+                            userId?.let {
+                                val updates = mapOf(
+                                    "college" to college,
+                                    "school" to school,
+                                    "department" to department,
+                                    "year" to year,
+                                    "semester" to semester
+                                )
+                                db.collection("users").document(it)
+                                    .set(updates, com.google.firebase.firestore.SetOptions.merge())
+                                    .addOnSuccessListener {
+                                        isSavingAcademic = false
+                                        saveAcademicMessage = "✅ Academic info saved!"
+                                    }
+                                    .addOnFailureListener { e ->
+                                        isSavingAcademic = false
+                                        saveAcademicMessage = "❌ ${e.message}"
+                                    }
+                            }
+                        },
+                        enabled = !isSavingAcademic,
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .height(50.dp),
+                        shape = RoundedCornerShape(44.dp),
+                        colors = ButtonDefaults.buttonColors(
+                            containerColor = Color(0xFF2C7DA0),
+                            contentColor = Color.White,
+                            disabledContainerColor = Color(0xFF2C7DA0).copy(alpha = 0.4f)
+                        )
+                    ) {
+                        if (isSavingAcademic) {
+                            CircularProgressIndicator(
+                                modifier = Modifier.size(20.dp),
+                                color = Color.White,
+                                strokeWidth = 2.dp
+                            )
+                        } else {
+                            Text("Update Academic Info", fontWeight = FontWeight.SemiBold)
+                        }
+                    }
                 }
             }
 
