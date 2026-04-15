@@ -1072,7 +1072,7 @@ fun AccountScreen(onBack: () -> Unit) {
                                         "role" to role
                                     )
                                     db.collection("users").document(it)
-                                        .update(updates)
+                                        .set(updates, com.google.firebase.firestore.SetOptions.merge())
                                         .addOnSuccessListener {
                                             isSaving = false
                                             saveMessage = "✅ Profile updated!"
