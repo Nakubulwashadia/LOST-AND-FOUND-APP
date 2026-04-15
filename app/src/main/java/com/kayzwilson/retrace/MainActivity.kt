@@ -878,20 +878,29 @@ fun AccountScreen(onBack: () -> Unit) {
     var foundCount by remember { mutableIntStateOf(2) }
     var reportsCount by remember { mutableIntStateOf(12) }
 
+    var isSavingPersonal by remember { mutableStateOf(false) }
+    var savePersonalMessage by remember { mutableStateOf("") }
+
     LaunchedEffect(userId) {
-        userId?.let {
-            db.collection("users").document(it).get()
+        userId?.let { uid ->
+            // ─── Pull email directly from Firebase Auth (always accurate)
+            val authEmail = auth.currentUser?.email ?: ""
+            email = authEmail
+
+            // ─── Pull the rest from Firestore
+            db.collection("users").document(uid).get()
                 .addOnSuccessListener { doc ->
-                    name = doc.getString("name") ?: "John Doe"
-                    role = doc.getString("role") ?: "Student"
-                    email = doc.getString("email") ?: ""
-                    phone = doc.getString("phone") ?: ""
-                    studentId = doc.getString("studentId") ?: ""
-                    department = doc.getString("department") ?: ""
-                    year = doc.getString("year") ?: ""
-                    semester = doc.getString("semester") ?: ""
-                    gpa = doc.getString("gpa") ?: ""
-                    residence = doc.getString("residence") ?: ""
+                    if (doc.exists()) {
+                        name = doc.getString("name") ?: ""
+                        role = doc.getString("role") ?: ""
+                        studentId = doc.getString("studentId") ?: ""  // student email saved at signup
+                        phone = doc.getString("phone") ?: ""
+                        department = doc.getString("department") ?: ""
+                        year = doc.getString("year") ?: ""
+                        semester = doc.getString("semester") ?: ""
+                        gpa = doc.getString("gpa") ?: ""
+                        residence = doc.getString("residence") ?: ""
+                    }
                 }
         }
     }
@@ -1139,31 +1148,39 @@ fun AccountScreen(onBack: () -> Unit) {
             Spacer(modifier = Modifier.height(20.dp))
 
             // Personal Information Section
+            // Personal Information Section
             InfoSectionCard(
                 title = "Personal Information",
                 icon = "👤"
             ) {
                 if (!isEditing) {
                     InfoRow(icon = "📧", label = "Email Address", value = email)
-                    InfoRow(icon = "📞", label = "Contact Number", value = phone)
-                    InfoRow(icon = "🎓", label = "Student ID", value = studentId)
+                    InfoRow(icon = "📞", label = "Contact Number", value = if (phone.isEmpty()) "Not set" else phone)
+                    InfoRow(icon = "🎓", label = "Student Email", value = studentId)
                 } else {
+                    // Email — read only, pulled from Firebase Auth
                     OutlinedTextField(
                         value = email,
-                        onValueChange = { email = it },
+                        onValueChange = { },
                         label = { Text("Email Address") },
+                        enabled = false, // 👈 can't change auth email this way
                         colors = OutlinedTextFieldDefaults.colors(
-                            focusedBorderColor = Color(0xFF2C7DA0),
-                            unfocusedBorderColor = Color(0xFFE2E8F0)
+                            disabledBorderColor = Color(0xFFE2E8F0),
+                            disabledTextColor = Color(0xFF8A99B4),
+                            disabledLabelColor = Color(0xFF8A99B4)
                         ),
                         shape = RoundedCornerShape(12.dp),
                         modifier = Modifier.fillMaxWidth()
                     )
+
                     Spacer(modifier = Modifier.height(12.dp))
+
+                    // Phone — editable, may not exist yet
                     OutlinedTextField(
                         value = phone,
                         onValueChange = { phone = it },
                         label = { Text("Contact Number") },
+                        placeholder = { Text("+256 700 000000") },
                         colors = OutlinedTextFieldDefaults.colors(
                             focusedBorderColor = Color(0xFF2C7DA0),
                             unfocusedBorderColor = Color(0xFFE2E8F0)
@@ -1171,18 +1188,79 @@ fun AccountScreen(onBack: () -> Unit) {
                         shape = RoundedCornerShape(12.dp),
                         modifier = Modifier.fillMaxWidth()
                     )
+
                     Spacer(modifier = Modifier.height(12.dp))
+
+                    // Student Email — read only, set at signup
                     OutlinedTextField(
                         value = studentId,
-                        onValueChange = { studentId = it },
-                        label = { Text("Student ID") },
+                        onValueChange = { },
+                        label = { Text("Student Email") },
+                        enabled = false, // 👈 shouldn't change after signup
                         colors = OutlinedTextFieldDefaults.colors(
-                            focusedBorderColor = Color(0xFF2C7DA0),
-                            unfocusedBorderColor = Color(0xFFE2E8F0)
+                            disabledBorderColor = Color(0xFFE2E8F0),
+                            disabledTextColor = Color(0xFF8A99B4),
+                            disabledLabelColor = Color(0xFF8A99B4)
                         ),
                         shape = RoundedCornerShape(12.dp),
                         modifier = Modifier.fillMaxWidth()
                     )
+
+                    Spacer(modifier = Modifier.height(16.dp))
+
+                    // Feedback message
+                    if (savePersonalMessage.isNotEmpty()) {
+                        Text(
+                            text = savePersonalMessage,
+                            color = if (savePersonalMessage.startsWith("✅")) Color(0xFF2C7DA0) else Color.Red,
+                            fontSize = 13.sp,
+                            modifier = Modifier.padding(bottom = 8.dp)
+                        )
+                    }
+
+                    // Update button for this section
+                    Button(
+                        onClick = {
+                            isSavingPersonal = true
+                            savePersonalMessage = ""
+                            userId?.let {
+                                val updates = mapOf(
+                                    "phone" to phone
+                                    // email and studentId are read-only here
+                                )
+                                db.collection("users").document(it)
+                                    .set(updates, com.google.firebase.firestore.SetOptions.merge())
+                                    .addOnSuccessListener {
+                                        isSavingPersonal = false
+                                        savePersonalMessage = "✅ Contact info saved!"
+                                    }
+                                    .addOnFailureListener { e ->
+                                        isSavingPersonal = false
+                                        savePersonalMessage = "❌ ${e.message}"
+                                    }
+                            }
+                        },
+                        enabled = !isSavingPersonal,
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .height(50.dp),
+                        shape = RoundedCornerShape(44.dp),
+                        colors = ButtonDefaults.buttonColors(
+                            containerColor = Color(0xFF2C7DA0),
+                            contentColor = Color.White,
+                            disabledContainerColor = Color(0xFF2C7DA0).copy(alpha = 0.4f)
+                        )
+                    ) {
+                        if (isSavingPersonal) {
+                            CircularProgressIndicator(
+                                modifier = Modifier.size(20.dp),
+                                color = Color.White,
+                                strokeWidth = 2.dp
+                            )
+                        } else {
+                            Text("Update Contact Info", fontWeight = FontWeight.SemiBold)
+                        }
+                    }
                 }
             }
 
