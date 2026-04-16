@@ -5,7 +5,7 @@ plugins {
  }
 
 android {
-    namespace = "com.example.retrace"
+    namespace = "com.kayzwilson.retrace"
     compileSdk {
         version = release(36) {
             minorApiLevel = 1
@@ -13,7 +13,7 @@ android {
     }
 
     defaultConfig {
-        applicationId = "com.example.retrace"
+        applicationId = "com.kayzwilson.retrace"
         minSdk = 34
         targetSdk = 36
         versionCode = 1

@@ -1,4 +1,4 @@
-package com.example.retrace
+package com.kayzwilson.retrace
 
 import android.net.Uri
 import androidx.activity.compose.rememberLauncherForActivityResult

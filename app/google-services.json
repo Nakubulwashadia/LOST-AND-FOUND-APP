@@ -1,21 +1,21 @@
 {
   "project_info": {
-    "project_number": "12696352359",
-    "project_id": "retraceapp-95234",
-    "storage_bucket": "retraceapp-95234.firebasestorage.app"
+    "project_number": "609259476181",
+    "project_id": "retrace-3f840",
+    "storage_bucket": "retrace-3f840.firebasestorage.app"
   },
   "client": [
     {
       "client_info": {
-        "mobilesdk_app_id": "1:12696352359:android:f0d9fa09f8e5cd707486c2",
+        "mobilesdk_app_id": "1:609259476181:android:729eb6aac19fc8b147be5c",
         "android_client_info": {
-          "package_name": "com.example.retrace"
+          "package_name": "com.kayzwilson.retrace"
         }
       },
       "oauth_client": [],
       "api_key": [
         {
-          "current_key": "AIzaSyAou74VzLwSI6s101uogKhoiWpmaJj5KLo"
+          "current_key": "AIzaSyCGl2rJPO5HH6j-fENS9RDquA78F_dykj4"
         }
       ],
       "services": {

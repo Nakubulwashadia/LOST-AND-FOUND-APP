@@ -1,4 +1,4 @@
-package com.example.retrace
+package com.kayzwilson.retrace
 
 import android.os.Bundle
 import androidx.activity.ComponentActivity
