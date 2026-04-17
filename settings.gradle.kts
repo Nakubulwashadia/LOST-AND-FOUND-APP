@@ -24,4 +24,7 @@ dependencyResolutionManagement {
 
 rootProject.name = "RETRACE"
 include(":app")
+<<<<<<< HEAD
  
+=======
+>>>>>>> 9bf0bbbc3f714c0e3cfa7bf6a149e9dc653e9bb9

@@ -1,4 +1,8 @@
 <?xml version="1.0" encoding="utf-8"?>
 <resources>
+<<<<<<< HEAD
+=======
+
+>>>>>>> 9bf0bbbc3f714c0e3cfa7bf6a149e9dc653e9bb9
     <style name="Theme.RETRACE" parent="android:Theme.Material.Light.NoActionBar" />
 </resources>
