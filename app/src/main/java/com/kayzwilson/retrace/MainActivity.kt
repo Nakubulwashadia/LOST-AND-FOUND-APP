@@ -44,6 +44,7 @@ import com.google.firebase.firestore.FirebaseFirestore
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
 import coil.compose.rememberAsyncImagePainter
+import androidx.compose.foundation.lazy.items
 // ─── Brand Colors ─────────────────────────────────────────────────────────────
 val RetraceNavy    = Color(0xFF1F1A44)
 val RetraceMidBlue = Color(0xFF2B4EA8)
@@ -555,6 +556,46 @@ fun FilterChip(text: String, isActive: Boolean) {
 }
 
 // ─── Lost Screen ─────────────────────────────────────────────────────────────
+// ─── Data class for Firestore items ──────────────────────────────────────────
+data class LostItemData(
+    val id: String = "",
+    val itemName: String = "",
+    val category: String = "",
+    val college: String = "",
+    val location: String = "",
+    val timeLost: String = "",
+    val description: String = "",
+    val imageUrl: String = "",
+    val reportedBy: String = "",
+    val timestamp: Long = 0L,
+    val status: String = "lost"
+)
+
+// ─── Category → Emoji avatar mapper ──────────────────────────────────────────
+fun categoryEmoji(category: String): String = when {
+    category.contains("Computer", ignoreCase = true) ||
+            category.contains("Laptop", ignoreCase = true)   -> "💻"
+    category.contains("Phone", ignoreCase = true)     -> "📱"
+    category.contains("Earphone", ignoreCase = true) ||
+            category.contains("Headphone", ignoreCase = true) -> "🎧"
+    category.contains("ID", ignoreCase = true) ||
+            category.contains("Card", ignoreCase = true)      -> "🪪"
+    category.contains("Bag", ignoreCase = true) ||
+            category.contains("Backpack", ignoreCase = true)  -> "🎒"
+    category.contains("Book", ignoreCase = true) ||
+            category.contains("Notes", ignoreCase = true)     -> "📚"
+    category.contains("Glass", ignoreCase = true) ||
+            category.contains("Spectacle", ignoreCase = true) -> "👓"
+    category.contains("Key", ignoreCase = true)       -> "🔑"
+    category.contains("Wallet", ignoreCase = true)    -> "💳"
+    category.contains("Cloth", ignoreCase = true)     -> "🧥"
+    category.contains("Watch", ignoreCase = true) ||
+            category.contains("Jewel", ignoreCase = true)     -> "⌚"
+    category.contains("Stationery", ignoreCase = true)-> "🖊️"
+    else -> "📦"
+}
+
+// ─── Lost Screen ─────────────────────────────────────────────────────────────
 @Composable
 fun LostScreen(
     onNavigateToFound: () -> Unit,
@@ -562,76 +603,375 @@ fun LostScreen(
     onNavigateToReport: () -> Unit
 ) {
     var search by remember { mutableStateOf("") }
+    var selectedFilter by remember { mutableStateOf("All") }
+    var items by remember { mutableStateOf<List<LostItemData>>(emptyList()) }
+    var isLoading by remember { mutableStateOf(true) }
+    var errorMessage by remember { mutableStateOf("") }
 
-    Column(modifier = Modifier.fillMaxSize().background(Color(0xFFF8FAFC))) {
+    val db = FirebaseFirestore.getInstance()
+    val filters = listOf("All", "Electronics", "Bags", "Books", "ID Cards", "Keys", "Other")
 
-        // Header
-        Text("Lost Items", fontSize = 28.sp, fontWeight = FontWeight.Bold,
-            color = Color(0xFF0F3B5C), modifier = Modifier.padding(16.dp))
+    // ── Real-time Firestore listener ──────────────────────────────────────
+    DisposableEffect(Unit) {
+        val listener = db.collection("lost_items")
+            .orderBy("timestamp", com.google.firebase.firestore.Query.Direction.DESCENDING)
+            .addSnapshotListener { snapshot, error ->
+                isLoading = false
+                if (error != null) {
+                    errorMessage = "Failed to load items: ${error.message}"
+                    return@addSnapshotListener
+                }
+                items = snapshot?.documents?.mapNotNull { doc ->
+                    doc.toObject(LostItemData::class.java)?.copy(id = doc.id)
+                } ?: emptyList()
+            }
+        onDispose { listener.remove() }
+    }
 
-        // Filter Chips
-        Row(
-            modifier = Modifier.horizontalScroll(rememberScrollState()).padding(horizontal = 12.dp),
-            horizontalArrangement = Arrangement.spacedBy(8.dp)
-        ) {
-            FilterChip("All", true)
-            FilterChip("Electronics", false)
-            FilterChip("Accessories", false)
-            FilterChip("Books", false)
-            FilterChip("ID Cards", false)
+    // ── Filter + search logic ─────────────────────────────────────────────
+    val filteredItems = items.filter { item ->
+        val matchesSearch = search.isBlank() ||
+                item.itemName.contains(search, ignoreCase = true) ||
+                item.description.contains(search, ignoreCase = true) ||
+                item.location.contains(search, ignoreCase = true) ||
+                item.category.contains(search, ignoreCase = true)
+
+        val matchesFilter = when (selectedFilter) {
+            "All"         -> true
+            "Electronics" -> item.category.contains("Computer", ignoreCase = true) ||
+                    item.category.contains("Laptop", ignoreCase = true) ||
+                    item.category.contains("Phone", ignoreCase = true) ||
+                    item.category.contains("Earphone", ignoreCase = true) ||
+                    item.category.contains("Headphone", ignoreCase = true)
+            "Bags"        -> item.category.contains("Bag", ignoreCase = true) ||
+                    item.category.contains("Backpack", ignoreCase = true)
+            "Books"       -> item.category.contains("Book", ignoreCase = true) ||
+                    item.category.contains("Notes", ignoreCase = true) ||
+                    item.category.contains("Stationery", ignoreCase = true)
+            "ID Cards"    -> item.category.contains("ID", ignoreCase = true) ||
+                    item.category.contains("Card", ignoreCase = true)
+            "Keys"        -> item.category.contains("Key", ignoreCase = true)
+            else          -> true
         }
+        matchesSearch && matchesFilter
+    }
 
-        Spacer(modifier = Modifier.height(12.dp))
+    Column(modifier = Modifier.fillMaxSize().background(Color(0xFFF0F4FA))) {
 
-        // Search Bar
-        OutlinedTextField(
-            value = search, onValueChange = { search = it },
-            placeholder = { Text("Search lost items...") },
-            leadingIcon = { Text("🔍") },
-            shape = RoundedCornerShape(50),
-            modifier = Modifier.fillMaxWidth().padding(horizontal = 16.dp)
-        )
-
-
-
-        Spacer(modifier = Modifier.height(8.dp))
-
-        Button(
-            onClick = { onNavigateToReport() },
-            shape = RoundedCornerShape(50),
-            colors = ButtonDefaults.buttonColors(containerColor = Color(0xFF0F3B5C)),
+        // ── Gradient header ───────────────────────────────────────────────
+        Box(
             modifier = Modifier
                 .fillMaxWidth()
-                .padding(horizontal = 16.dp)
+                .background(
+                    Brush.verticalGradient(
+                        colors = listOf(Color(0xFF0F3B5C), Color(0xFF1A5C8A))
+                    )
+                )
+                .padding(horizontal = 20.dp, vertical = 20.dp)
         ) {
-            Text("Report Lost Item", color = Color.White)
+            Column {
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.SpaceBetween,
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    Column {
+                        Text(
+                            "Lost Items",
+                            fontSize = 30.sp,
+                            fontWeight = FontWeight.ExtraBold,
+                            color = Color.White,
+                            letterSpacing = 0.5.sp
+                        )
+                        Text(
+                            "${items.size} item${if (items.size != 1) "s" else ""} reported",
+                            fontSize = 13.sp,
+                            color = Color.White.copy(alpha = 0.65f)
+                        )
+                    }
+                    // Report button (top-right)
+                    Button(
+                        onClick = onNavigateToReport,
+                        shape = RoundedCornerShape(50),
+                        colors = ButtonDefaults.buttonColors(containerColor = Color(0xFF5B8FF9)),
+                        contentPadding = PaddingValues(horizontal = 16.dp, vertical = 10.dp),
+                        elevation = ButtonDefaults.buttonElevation(defaultElevation = 4.dp)
+                    ) {
+                        Text("+ Report", color = Color.White, fontWeight = FontWeight.Bold, fontSize = 14.sp)
+                    }
+                }
+
+                Spacer(modifier = Modifier.height(16.dp))
+
+                // Search bar inside header
+                OutlinedTextField(
+                    value = search,
+                    onValueChange = { search = it },
+                    placeholder = { Text("Search lost items...", color = Color.White.copy(alpha = 0.5f)) },
+                    leadingIcon = { Text("🔍", modifier = Modifier.padding(start = 4.dp)) },
+                    shape = RoundedCornerShape(50),
+                    modifier = Modifier.fillMaxWidth(),
+                    colors = OutlinedTextFieldDefaults.colors(
+                        unfocusedBorderColor = Color.White.copy(alpha = 0.25f),
+                        focusedBorderColor = Color(0xFF5B8FF9),
+                        unfocusedTextColor = Color.White,
+                        focusedTextColor = Color.White,
+                        cursorColor = Color.White
+                    ),
+                    singleLine = true
+                )
+            }
         }
 
-        Spacer(modifier = Modifier.height(12.dp))
-
-        // Feed
-        LazyColumn(modifier = Modifier.weight(1f).padding(horizontal = 12.dp)) {
-            item {
-                LostItemCard(name = "Emma Rodriguez", course = "Computer Science • 2nd year",
-                    item = "MacBook Pro 14\"", emoji = "💻")
-            }
-            item {
-                LostItemCard(name = "James Chen", course = "Business • 3rd year",
-                    item = "AirPods Pro", emoji = "🎧")
-            }
-            item {
-                LostItemCard(name = "Sophia Martinez", course = "Biology • 1st year",
-                    item = "Student ID Card", emoji = "🪪")
+        // ── Filter chips ──────────────────────────────────────────────────
+        Row(
+            modifier = Modifier
+                .fillMaxWidth()
+                .background(Color.White)
+                .horizontalScroll(rememberScrollState())
+                .padding(horizontal = 16.dp, vertical = 12.dp),
+            horizontalArrangement = Arrangement.spacedBy(8.dp)
+        ) {
+            filters.forEach { filter ->
+                val isActive = filter == selectedFilter
+                Box(
+                    modifier = Modifier
+                        .clip(RoundedCornerShape(50))
+                        .background(
+                            if (isActive)
+                                Brush.linearGradient(listOf(Color(0xFF1A5C8A), Color(0xFF2C7DA0)))
+                            else
+                                Brush.linearGradient(listOf(Color(0xFFEEF4FB), Color(0xFFEEF4FB)))
+                        )
+                        .clickable { selectedFilter = filter }
+                        .padding(horizontal = 16.dp, vertical = 8.dp)
+                ) {
+                    Text(
+                        filter,
+                        color = if (isActive) Color.White else Color(0xFF1A5C8A),
+                        fontSize = 13.sp,
+                        fontWeight = if (isActive) FontWeight.Bold else FontWeight.Normal
+                    )
+                }
             }
         }
 
-        // Bottom Nav — Lost is active
+        // ── Body ──────────────────────────────────────────────────────────
+        when {
+            isLoading -> {
+                Box(modifier = Modifier.weight(1f).fillMaxWidth(), contentAlignment = Alignment.Center) {
+                    Column(horizontalAlignment = Alignment.CenterHorizontally) {
+                        CircularProgressIndicator(color = Color(0xFF2C7DA0), strokeWidth = 3.dp)
+                        Spacer(modifier = Modifier.height(12.dp))
+                        Text("Loading lost items...", fontSize = 14.sp, color = Color(0xFF5B6E8C))
+                    }
+                }
+            }
+
+            errorMessage.isNotEmpty() -> {
+                Box(modifier = Modifier.weight(1f).fillMaxWidth(), contentAlignment = Alignment.Center) {
+                    Column(horizontalAlignment = Alignment.CenterHorizontally, modifier = Modifier.padding(24.dp)) {
+                        Text("⚠️", fontSize = 42.sp)
+                        Spacer(modifier = Modifier.height(8.dp))
+                        Text(errorMessage, fontSize = 14.sp, color = Color(0xFFE53935), textAlign = TextAlign.Center)
+                    }
+                }
+            }
+
+            filteredItems.isEmpty() -> {
+                Box(modifier = Modifier.weight(1f).fillMaxWidth(), contentAlignment = Alignment.Center) {
+                    Column(horizontalAlignment = Alignment.CenterHorizontally, modifier = Modifier.padding(24.dp)) {
+                        Text(if (search.isNotBlank()) "🔍" else "📭", fontSize = 52.sp)
+                        Spacer(modifier = Modifier.height(12.dp))
+                        Text(
+                            if (search.isNotBlank()) "No results for \"$search\""
+                            else "No lost items yet",
+                            fontSize = 17.sp, fontWeight = FontWeight.Bold, color = Color(0xFF0F3B5C),
+                            textAlign = TextAlign.Center
+                        )
+                        Spacer(modifier = Modifier.height(6.dp))
+                        Text(
+                            if (search.isNotBlank()) "Try a different search term"
+                            else "Be the first to report a lost item",
+                            fontSize = 13.sp, color = Color.Gray, textAlign = TextAlign.Center
+                        )
+                        if (search.isBlank()) {
+                            Spacer(modifier = Modifier.height(20.dp))
+                            Button(
+                                onClick = onNavigateToReport,
+                                shape = RoundedCornerShape(50),
+                                colors = ButtonDefaults.buttonColors(containerColor = Color(0xFF2C7DA0))
+                            ) { Text("Report Lost Item", color = Color.White, fontWeight = FontWeight.Bold) }
+                        }
+                    }
+                }
+            }
+
+            else -> {
+                LazyColumn(
+                    modifier = Modifier.weight(1f),
+                    contentPadding = PaddingValues(horizontal = 16.dp, vertical = 12.dp),
+                    verticalArrangement = Arrangement.spacedBy(14.dp)
+                ) {
+                    items(filteredItems.size) { index ->
+                        LostItemCard(item = filteredItems[index])
+                    }
+                }
+            }
+        }
+
         BottomNavBar(
             activeTab           = NavTab.LOST,
-            onNavigateToLost    = { /* already here */ },
+            onNavigateToLost    = { },
             onNavigateToFound   = onNavigateToFound,
             onNavigateToAccount = onNavigateToAccount
         )
+    }
+}
+
+// ─── Lost Item Card (dynamic) ─────────────────────────────────────────────────
+@Composable
+fun LostItemCard(item: LostItemData) {
+    val emoji = categoryEmoji(item.category)
+    val formattedTime = remember(item.timestamp) {
+        if (item.timestamp > 0) {
+            val sdf = java.text.SimpleDateFormat("MMM d, yyyy", java.util.Locale.getDefault())
+            sdf.format(java.util.Date(item.timestamp))
+        } else "Unknown date"
+    }
+
+    Card(
+        shape = RoundedCornerShape(20.dp),
+        modifier = Modifier.fillMaxWidth(),
+        colors = CardDefaults.cardColors(containerColor = Color.White),
+        elevation = CardDefaults.cardElevation(defaultElevation = 2.dp)
+    ) {
+        Column {
+            // ── Image / avatar section ────────────────────────────────────
+            Box(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .height(200.dp)
+                    .clip(RoundedCornerShape(topStart = 20.dp, topEnd = 20.dp))
+            ) {
+                if (item.imageUrl.isNotEmpty()) {
+                    androidx.compose.foundation.Image(
+                        painter = rememberAsyncImagePainter(item.imageUrl),
+                        contentDescription = item.itemName,
+                        contentScale = androidx.compose.ui.layout.ContentScale.Crop,
+                        modifier = Modifier.fillMaxSize()
+                    )
+                } else {
+                    // Gradient avatar with emoji
+                    Box(
+                        modifier = Modifier
+                            .fillMaxSize()
+                            .background(
+                                Brush.linearGradient(
+                                    colors = listOf(Color(0xFFDCEAF7), Color(0xFFEEF4FB))
+                                )
+                            ),
+                        contentAlignment = Alignment.Center
+                    ) {
+                        Column(horizontalAlignment = Alignment.CenterHorizontally) {
+                            Text(emoji, fontSize = 72.sp)
+                            Spacer(modifier = Modifier.height(4.dp))
+                            Text(
+                                item.category.substringAfter(" ").ifEmpty { item.category },
+                                fontSize = 12.sp,
+                                color = Color(0xFF5B6E8C),
+                                fontWeight = FontWeight.Medium
+                            )
+                        }
+                    }
+                }
+                // LOST badge overlay
+                Box(
+                    modifier = Modifier
+                        .align(Alignment.TopEnd)
+                        .padding(10.dp)
+                        .background(Color(0xFFE53935), RoundedCornerShape(50))
+                        .padding(horizontal = 10.dp, vertical = 4.dp)
+                ) {
+                    Text("LOST", color = Color.White, fontSize = 11.sp, fontWeight = FontWeight.ExtraBold, letterSpacing = 1.sp)
+                }
+            }
+
+            // ── Details ───────────────────────────────────────────────────
+            Column(modifier = Modifier.padding(14.dp)) {
+                Text(
+                    item.itemName.ifEmpty { "Unnamed Item" },
+                    fontWeight = FontWeight.ExtraBold,
+                    fontSize = 18.sp,
+                    color = Color(0xFF0F3B5C)
+                )
+
+                if (item.description.isNotEmpty()) {
+                    Spacer(modifier = Modifier.height(4.dp))
+                    Text(
+                        item.description,
+                        fontSize = 13.sp,
+                        color = Color(0xFF5B6E8C),
+                        maxLines = 2,
+                        overflow = androidx.compose.ui.text.style.TextOverflow.Ellipsis
+                    )
+                }
+
+                Spacer(modifier = Modifier.height(10.dp))
+
+                // Meta info row
+                Row(horizontalArrangement = Arrangement.spacedBy(12.dp)) {
+                    if (item.location.isNotEmpty()) {
+                        Row(verticalAlignment = Alignment.CenterVertically) {
+                            Text("📍", fontSize = 12.sp)
+                            Spacer(modifier = Modifier.width(3.dp))
+                            Text(item.location, fontSize = 12.sp, color = Color(0xFF5B6E8C),
+                                maxLines = 1, overflow = androidx.compose.ui.text.style.TextOverflow.Ellipsis,
+                                modifier = Modifier.widthIn(max = 110.dp))
+                        }
+                    }
+                    if (item.timeLost.isNotEmpty()) {
+                        Row(verticalAlignment = Alignment.CenterVertically) {
+                            Text("⏰", fontSize = 12.sp)
+                            Spacer(modifier = Modifier.width(3.dp))
+                            Text(item.timeLost, fontSize = 12.sp, color = Color(0xFF5B6E8C))
+                        }
+                    }
+                }
+
+                Spacer(modifier = Modifier.height(4.dp))
+                Row(verticalAlignment = Alignment.CenterVertically) {
+                    Text("📅", fontSize = 12.sp)
+                    Spacer(modifier = Modifier.width(3.dp))
+                    Text(formattedTime, fontSize = 12.sp, color = Color(0xFF5B6E8C))
+                }
+
+                if (item.college.isNotEmpty()) {
+                    Spacer(modifier = Modifier.height(4.dp))
+                    Row(verticalAlignment = Alignment.CenterVertically) {
+                        Text("🏛️", fontSize = 12.sp)
+                        Spacer(modifier = Modifier.width(3.dp))
+                        Text(item.college, fontSize = 12.sp, color = Color(0xFF5B6E8C),
+                            maxLines = 1, overflow = androidx.compose.ui.text.style.TextOverflow.Ellipsis)
+                    }
+                }
+
+                Spacer(modifier = Modifier.height(12.dp))
+
+                Button(
+                    onClick = { },
+                    modifier = Modifier.fillMaxWidth().height(42.dp),
+                    shape = RoundedCornerShape(50),
+                    colors = ButtonDefaults.buttonColors(
+                        containerColor = Color(0xFF0F3B5C),
+                        contentColor = Color.White
+                    ),
+                    elevation = ButtonDefaults.buttonElevation(defaultElevation = 2.dp)
+                ) {
+                    Text("Contact Owner", fontSize = 14.sp, fontWeight = FontWeight.Bold)
+                }
+            }
+        }
     }
 }
 
@@ -1092,45 +1432,7 @@ fun FoundScreen(onNavigateToLost: () -> Unit, onNavigateToAccount: () -> Unit) {
     }
 }
 
-// ─── Lost Item Card ───────────────────────────────────────────────────────────
-@Composable
-fun LostItemCard(name: String, course: String, item: String, emoji: String) {
-    Card(
-        shape = RoundedCornerShape(20.dp),
-        modifier = Modifier.fillMaxWidth().padding(vertical = 8.dp),
-        colors = CardDefaults.cardColors(containerColor = Color.White)
-    ) {
-        Column {
-            Row(modifier = Modifier.fillMaxWidth().padding(12.dp), verticalAlignment = Alignment.CenterVertically) {
-                Box(modifier = Modifier.size(40.dp).background(Color(0xFF2C7DA0), CircleShape),
-                    contentAlignment = Alignment.Center) { Text("👩‍🎓") }
-                Spacer(modifier = Modifier.width(10.dp))
-                Column(modifier = Modifier.weight(1f)) {
-                    Text(name, fontWeight = FontWeight.Bold)
-                    Text(course, fontSize = 12.sp, color = Color.Gray)
-                }
-                Text("LOST", color = Color.Red, fontSize = 11.sp,
-                    modifier = Modifier.background(Color(0xFFFEE2E2), RoundedCornerShape(50))
-                        .padding(horizontal = 10.dp, vertical = 4.dp))
-            }
-            Box(modifier = Modifier.fillMaxWidth().height(180.dp).background(Color(0xFFE2E8F0)),
-                contentAlignment = Alignment.Center) { Text(emoji, fontSize = 40.sp) }
-            Column(modifier = Modifier.padding(12.dp)) {
-                Text(item, fontWeight = FontWeight.Bold, fontSize = 18.sp)
-                Spacer(modifier = Modifier.height(6.dp))
-                Text("📅 March 25, 2026", fontSize = 13.sp)
-                Text("⏰ 2:30 PM", fontSize = 13.sp)
-                Text("🏫 Engineering Hall", fontSize = 13.sp)
-            }
-            Button(
-                onClick = { },
-                modifier = Modifier.fillMaxWidth().padding(12.dp),
-                shape = RoundedCornerShape(50),
-                colors = ButtonDefaults.buttonColors(containerColor = Color(0xFF2C7DA0))
-            ) { Text("Contact", color = Color.White) }
-        }
-    }
-}
+
 
 // ─── Account Screen ───────────────────────────────────────────────────────────
 @OptIn(ExperimentalMaterial3Api::class)
