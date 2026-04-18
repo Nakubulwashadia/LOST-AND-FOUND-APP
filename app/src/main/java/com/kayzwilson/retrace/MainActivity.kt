@@ -56,7 +56,8 @@ val RetraceGrey    = Color(0xFF8A94A6)
 val RetraceError   = Color(0xFFE53935)
 
 // ─── Navigation ───────────────────────────────────────────────────────────────
-enum class Screen { SPLASH, LOGIN, SIGNUP, LOST, FOUND, ACCOUNT, REPORT }
+// Add REPORT_FOUND to your Screen enum
+enum class Screen { SPLASH, LOGIN, SIGNUP, LOST, FOUND, ACCOUNT, REPORT, REPORT_FOUND }
 enum class NavTab  { LOST, FOUND, ACCOUNT }
 
 // ─── Entry Point ──────────────────────────────────────────────────────────────
@@ -97,7 +98,8 @@ fun RetraceApp() {
 
         Screen.FOUND -> FoundScreen(
             onNavigateToLost    = { currentScreen = Screen.LOST },
-            onNavigateToAccount = { currentScreen = Screen.ACCOUNT }
+            onNavigateToAccount = { currentScreen = Screen.ACCOUNT },
+            onNavigateToReport  = { currentScreen = Screen.REPORT_FOUND }
         )
 
         Screen.ACCOUNT -> AccountScreen(
@@ -109,6 +111,11 @@ fun RetraceApp() {
         Screen.REPORT -> ReportLostItemScreen(
             onBack = { currentScreen = Screen.LOST },
             onSubmit = { currentScreen = Screen.LOST }
+        )
+
+        Screen.REPORT_FOUND -> ReportFoundItemScreen(
+            onBack   = { currentScreen = Screen.FOUND },
+            onSubmit = { currentScreen = Screen.FOUND }
         )
     }
 }
@@ -1576,65 +1583,775 @@ fun ReportLostItemScreen(
         }
     }
 }// ─── Found Screen ─────────────────────────────────────────────────────────────
+
+// ─── Found Item Data Class ────────────────────────────────────────────────────
+data class FoundItemData(
+    val id: String = "",
+    val itemName: String = "",
+    val category: String = "",
+    val college: String = "",
+    val location: String = "",
+    val timeFound: String = "",
+    val description: String = "",
+    val imageUrl: String = "",
+    val reportedBy: String = "",
+    val timestamp: Long = 0L,
+    val status: String = "found"
+)
+// ─── Found Screen ─────────────────────────────────────────────────────────────
 @Composable
-fun FoundScreen(onNavigateToLost: () -> Unit, onNavigateToAccount: () -> Unit) {
+fun FoundScreen(onNavigateToLost: () -> Unit, onNavigateToAccount: () -> Unit, onNavigateToReport: () -> Unit) {
     var search by remember { mutableStateOf("") }
+    var selectedFilter by remember { mutableStateOf("All") }
+    var items by remember { mutableStateOf<List<FoundItemData>>(emptyList()) }
+    var isLoading by remember { mutableStateOf(true) }
+    var errorMessage by remember { mutableStateOf("") }
 
-    Column(modifier = Modifier.fillMaxSize().background(Color(0xFFF8FAFC))) {
+    val db = FirebaseFirestore.getInstance()
+    val filters = listOf("All", "Electronics", "Bags", "Books", "ID Cards", "Keys", "Other")
 
-        // Header
-        Text("Found Items", fontSize = 28.sp, fontWeight = FontWeight.Bold,
-            color = Color(0xFF0F3B5C), modifier = Modifier.padding(16.dp))
+    DisposableEffect(Unit) {
+        val listener = db.collection("found_items")
+            .orderBy("timestamp", com.google.firebase.firestore.Query.Direction.DESCENDING)
+            .addSnapshotListener { snapshot, error ->
+                isLoading = false
+                if (error != null) { errorMessage = "Failed to load items: ${error.message}"; return@addSnapshotListener }
+                items = snapshot?.documents?.mapNotNull { doc ->
+                    doc.toObject(FoundItemData::class.java)?.copy(id = doc.id)
+                } ?: emptyList()
+            }
+        onDispose { listener.remove() }
+    }
 
-        // Filter Chips
-        Row(
-            modifier = Modifier.horizontalScroll(rememberScrollState()).padding(horizontal = 12.dp),
-            horizontalArrangement = Arrangement.spacedBy(8.dp)
-        ) {
-            FilterChip("All", true)
-            FilterChip("Electronics", false)
-            FilterChip("Accessories", false)
-            FilterChip("Books", false)
-            FilterChip("ID Cards", false)
+    val filteredItems = items.filter { item ->
+        val matchesSearch = search.isBlank() ||
+                item.itemName.contains(search, ignoreCase = true) ||
+                item.description.contains(search, ignoreCase = true) ||
+                item.location.contains(search, ignoreCase = true) ||
+                item.category.contains(search, ignoreCase = true)
+        val matchesFilter = when (selectedFilter) {
+            "All"         -> true
+            "Electronics" -> item.category.contains("Computer", ignoreCase = true) ||
+                    item.category.contains("Laptop", ignoreCase = true) ||
+                    item.category.contains("Phone", ignoreCase = true) ||
+                    item.category.contains("Earphone", ignoreCase = true) ||
+                    item.category.contains("Headphone", ignoreCase = true)
+            "Bags"        -> item.category.contains("Bag", ignoreCase = true) || item.category.contains("Backpack", ignoreCase = true)
+            "Books"       -> item.category.contains("Book", ignoreCase = true) || item.category.contains("Notes", ignoreCase = true)
+            "ID Cards"    -> item.category.contains("ID", ignoreCase = true) || item.category.contains("Card", ignoreCase = true)
+            "Keys"        -> item.category.contains("Key", ignoreCase = true)
+            else          -> true
         }
+        matchesSearch && matchesFilter
+    }
 
-        Spacer(modifier = Modifier.height(12.dp))
+    Column(modifier = Modifier.fillMaxSize().background(Color(0xFFF0FAF4))) {
 
-        // Search Bar
-        OutlinedTextField(
-            value = search, onValueChange = { search = it },
-            placeholder = { Text("Search found items...") },
-            leadingIcon = { Text("🔍") },
-            shape = RoundedCornerShape(50),
-            modifier = Modifier.fillMaxWidth().padding(horizontal = 16.dp)
-        )
-
-        Spacer(modifier = Modifier.height(12.dp))
-
-        // Empty state
-        Box(modifier = Modifier.weight(1f).fillMaxWidth(), contentAlignment = Alignment.Center) {
-            Column(horizontalAlignment = Alignment.CenterHorizontally) {
-                Text("✅", fontSize = 48.sp)
-                Spacer(modifier = Modifier.height(12.dp))
-                Text("No found items yet", fontSize = 16.sp,
-                    fontWeight = FontWeight.SemiBold, color = Color(0xFF0F3B5C))
-                Spacer(modifier = Modifier.height(4.dp))
-                Text("Items reported as found will appear here",
-                    fontSize = 13.sp, color = Color.Gray)
+        // ── Gradient Header ───────────────────────────────────────────────
+        Box(
+            modifier = Modifier
+                .fillMaxWidth()
+                .background(Brush.verticalGradient(colors = listOf(Color(0xFF0A3D2B), Color(0xFF1A6B47))))
+                .padding(horizontal = 20.dp, vertical = 20.dp)
+        ) {
+            Column {
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.SpaceBetween,
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    Column {
+                        Text("Found Items", fontSize = 30.sp, fontWeight = FontWeight.ExtraBold,
+                            color = Color.White, letterSpacing = 0.5.sp)
+                        Text("${items.size} item${if (items.size != 1) "s" else ""} found",
+                            fontSize = 13.sp, color = Color.White.copy(alpha = 0.65f))
+                    }
+                    Button(
+                        onClick = onNavigateToReport,
+                        shape = RoundedCornerShape(50),
+                        colors = ButtonDefaults.buttonColors(containerColor = Color(0xFF4CAF82)),
+                        contentPadding = PaddingValues(horizontal = 16.dp, vertical = 10.dp),
+                        elevation = ButtonDefaults.buttonElevation(defaultElevation = 4.dp)
+                    ) {
+                        Text("+ Found", color = Color.White, fontWeight = FontWeight.Bold, fontSize = 14.sp)
+                    }
+                }
+                Spacer(modifier = Modifier.height(16.dp))
+                OutlinedTextField(
+                    value = search, onValueChange = { search = it },
+                    placeholder = { Text("Search found items...", color = Color.White.copy(alpha = 0.5f)) },
+                    leadingIcon = { Text("🔍", modifier = Modifier.padding(start = 4.dp)) },
+                    shape = RoundedCornerShape(50),
+                    modifier = Modifier.fillMaxWidth(),
+                    colors = OutlinedTextFieldDefaults.colors(
+                        unfocusedBorderColor = Color.White.copy(alpha = 0.25f),
+                        focusedBorderColor = Color(0xFF4CAF82),
+                        unfocusedTextColor = Color.White,
+                        focusedTextColor = Color.White,
+                        cursorColor = Color.White
+                    ),
+                    singleLine = true
+                )
             }
         }
 
-        // Bottom Nav — Found is active
+        // ── Filter Chips ──────────────────────────────────────────────────
+        Row(
+            modifier = Modifier.fillMaxWidth().background(Color.White)
+                .horizontalScroll(rememberScrollState()).padding(horizontal = 16.dp, vertical = 12.dp),
+            horizontalArrangement = Arrangement.spacedBy(8.dp)
+        ) {
+            filters.forEach { filter ->
+                val isActive = filter == selectedFilter
+                Box(
+                    modifier = Modifier
+                        .clip(RoundedCornerShape(50))
+                        .background(
+                            if (isActive) Brush.linearGradient(listOf(Color(0xFF0A3D2B), Color(0xFF1A6B47)))
+                            else Brush.linearGradient(listOf(Color(0xFFECF8F2), Color(0xFFECF8F2)))
+                        )
+                        .clickable { selectedFilter = filter }
+                        .padding(horizontal = 16.dp, vertical = 8.dp)
+                ) {
+                    Text(filter,
+                        color = if (isActive) Color.White else Color(0xFF0A3D2B),
+                        fontSize = 13.sp,
+                        fontWeight = if (isActive) FontWeight.Bold else FontWeight.Normal)
+                }
+            }
+        }
+
+        // ── Body ──────────────────────────────────────────────────────────
+        when {
+            isLoading -> {
+                Box(modifier = Modifier.weight(1f).fillMaxWidth(), contentAlignment = Alignment.Center) {
+                    Column(horizontalAlignment = Alignment.CenterHorizontally) {
+                        CircularProgressIndicator(color = Color(0xFF1A6B47), strokeWidth = 3.dp)
+                        Spacer(modifier = Modifier.height(12.dp))
+                        Text("Loading found items...", fontSize = 14.sp, color = Color(0xFF5B6E8C))
+                    }
+                }
+            }
+            errorMessage.isNotEmpty() -> {
+                Box(modifier = Modifier.weight(1f).fillMaxWidth(), contentAlignment = Alignment.Center) {
+                    Column(horizontalAlignment = Alignment.CenterHorizontally, modifier = Modifier.padding(24.dp)) {
+                        Text("⚠️", fontSize = 42.sp)
+                        Spacer(modifier = Modifier.height(8.dp))
+                        Text(errorMessage, fontSize = 14.sp, color = Color(0xFFE53935), textAlign = TextAlign.Center)
+                    }
+                }
+            }
+            filteredItems.isEmpty() -> {
+                Box(modifier = Modifier.weight(1f).fillMaxWidth(), contentAlignment = Alignment.Center) {
+                    Column(horizontalAlignment = Alignment.CenterHorizontally, modifier = Modifier.padding(24.dp)) {
+                        Text(if (search.isNotBlank()) "🔍" else "📭", fontSize = 52.sp)
+                        Spacer(modifier = Modifier.height(12.dp))
+                        Text(
+                            if (search.isNotBlank()) "No results for \"$search\"" else "No found items yet",
+                            fontSize = 17.sp, fontWeight = FontWeight.Bold,
+                            color = Color(0xFF0A3D2B), textAlign = TextAlign.Center
+                        )
+                        Spacer(modifier = Modifier.height(6.dp))
+                        Text(
+                            if (search.isNotBlank()) "Try a different search term"
+                            else "Found something? Post it here!",
+                            fontSize = 13.sp, color = Color.Gray, textAlign = TextAlign.Center
+                        )
+                        if (search.isBlank()) {
+                            Spacer(modifier = Modifier.height(20.dp))
+                            Button(
+                                onClick = onNavigateToReport,
+                                shape = RoundedCornerShape(50),
+                                colors = ButtonDefaults.buttonColors(containerColor = Color(0xFF1A6B47))
+                            ) { Text("Report Found Item", color = Color.White, fontWeight = FontWeight.Bold) }
+                        }
+                    }
+                }
+            }
+            else -> {
+                LazyColumn(
+                    modifier = Modifier.weight(1f),
+                    contentPadding = PaddingValues(horizontal = 16.dp, vertical = 12.dp),
+                    verticalArrangement = Arrangement.spacedBy(14.dp)
+                ) {
+                    items(filteredItems) { item -> FoundItemCard(item = item) }
+                }
+            }
+        }
+
         BottomNavBar(
-            activeTab           = NavTab.FOUND,
-            onNavigateToLost    = onNavigateToLost,
-            onNavigateToFound   = { /* already here */ },
-            onNavigateToAccount = onNavigateToAccount
+            activeTab = NavTab.FOUND,
+            onNavigateToLost = onNavigateToLost,
+            onNavigateToFound = { },
+            onNavigateToAccount = { }
         )
     }
 }
 
+// ─── Report Found Item Screen ─────────────────────────────────────────────────
+@OptIn(ExperimentalMaterial3Api::class)
+@Composable
+fun ReportFoundItemScreen(onSubmit: () -> Unit, onBack: () -> Unit) {
+    var itemName     by remember { mutableStateOf("") }
+    var category     by remember { mutableStateOf("") }
+    var college      by remember { mutableStateOf("") }
+    var location     by remember { mutableStateOf("") }
+    var time         by remember { mutableStateOf("") }
+    var description  by remember { mutableStateOf("") }
+    var imageUri     by remember { mutableStateOf<android.net.Uri?>(null) }
+    var isSubmitting by remember { mutableStateOf(false) }
+    var submitError  by remember { mutableStateOf("") }
+    var categoryExpanded by remember { mutableStateOf(false) }
+    var showTimePicker   by remember { mutableStateOf(false) }
+    val timePickerState  = rememberTimePickerState(is24Hour = false)
 
+    val categories = listOf(
+        "💻 Computer / Laptop", "📱 Phone", "🎧 Earphones / Headphones",
+        "🪪 ID Card / Student Card", "🎒 Bag / Backpack", "📚 Books / Notes",
+        "👓 Glasses / Spectacles", "🔑 Keys", "💳 Wallet / Cards",
+        "🧥 Clothing", "⌚ Watch / Jewelry", "🖊️ Stationery", "Other"
+    )
+
+    val imagePickerLauncher = rememberLauncherForActivityResult(
+        ActivityResultContracts.GetContent()
+    ) { uri -> imageUri = uri }
+
+    // Image is mandatory here
+    val canSubmit = itemName.isNotBlank() && category.isNotBlank() &&
+            location.isNotBlank() && time.isNotBlank() && imageUri != null
+
+    if (showTimePicker) {
+        AlertDialog(
+            onDismissRequest = { showTimePicker = false },
+            confirmButton = {
+                TextButton(onClick = {
+                    val hour = timePickerState.hour
+                    val minute = timePickerState.minute
+                    val amPm = if (hour < 12) "AM" else "PM"
+                    val h = if (hour % 12 == 0) 12 else hour % 12
+                    time = "%d:%02d %s".format(h, minute, amPm)
+                    showTimePicker = false
+                }) { Text("OK", color = Color(0xFF1A6B47)) }
+            },
+            dismissButton = {
+                TextButton(onClick = { showTimePicker = false }) {
+                    Text("Cancel", color = Color.Gray)
+                }
+            },
+            title = { Text("Select Time Found", fontWeight = FontWeight.SemiBold) },
+            text = { TimePicker(state = timePickerState) }
+        )
+    }
+
+    Scaffold(
+        containerColor = Color(0xFFF0FAF4),
+        topBar = {
+            TopAppBar(
+                title = { Text("Report Found Item", fontSize = 20.sp,
+                    fontWeight = FontWeight.SemiBold, color = Color(0xFF0A3D2B)) },
+                navigationIcon = {
+                    IconButton(onClick = onBack) {
+                        Icon(Icons.AutoMirrored.Filled.ArrowBack,
+                            contentDescription = "Back", tint = Color(0xFF1A6B47))
+                    }
+                },
+                colors = TopAppBarDefaults.topAppBarColors(containerColor = Color.White)
+            )
+        }
+    ) { paddingValues ->
+        Column(
+            modifier = Modifier.fillMaxSize().background(Color(0xFFF0FAF4))
+                .verticalScroll(rememberScrollState())
+                .padding(paddingValues).padding(horizontal = 16.dp).padding(bottom = 32.dp)
+        ) {
+            Spacer(modifier = Modifier.height(12.dp))
+
+            // ── Image Upload Card (Mandatory) ─────────────────────────────
+            Card(
+                shape = RoundedCornerShape(20.dp),
+                colors = CardDefaults.cardColors(containerColor = Color.White),
+                elevation = CardDefaults.cardElevation(0.dp),
+                modifier = Modifier.fillMaxWidth()
+            ) {
+                Column(modifier = Modifier.padding(20.dp), horizontalAlignment = Alignment.CenterHorizontally) {
+                    Row(verticalAlignment = Alignment.CenterVertically,
+                        modifier = Modifier.fillMaxWidth().padding(bottom = 14.dp)) {
+                        Text("📷", fontSize = 20.sp)
+                        Spacer(modifier = Modifier.width(8.dp))
+                        Text("Item Photo", fontSize = 16.sp,
+                            fontWeight = FontWeight.SemiBold, color = Color(0xFF0A3D2B))
+                        Spacer(modifier = Modifier.width(6.dp))
+                        // Mandatory badge
+                        Box(
+                            modifier = Modifier
+                                .background(Color(0xFFFFEBEE), RoundedCornerShape(50))
+                                .padding(horizontal = 8.dp, vertical = 3.dp)
+                        ) {
+                            Text("Required", fontSize = 11.sp,
+                                color = Color(0xFFE53935), fontWeight = FontWeight.Bold)
+                        }
+                    }
+                    Box(
+                        modifier = Modifier.fillMaxWidth().height(200.dp)
+                            .clip(RoundedCornerShape(14.dp))
+                            .background(if (imageUri == null) Color(0xFFF0FAF4) else Color.Transparent)
+                            .border(
+                                2.dp,
+                                if (imageUri == null) Color(0xFF1A6B47).copy(alpha = 0.4f) else Color(0xFF1A6B47),
+                                RoundedCornerShape(14.dp)
+                            )
+                            .clickable { imagePickerLauncher.launch("image/*") },
+                        contentAlignment = Alignment.Center
+                    ) {
+                        if (imageUri != null) {
+                            androidx.compose.foundation.Image(
+                                painter = rememberAsyncImagePainter(imageUri),
+                                contentDescription = "Selected image",
+                                contentScale = androidx.compose.ui.layout.ContentScale.Crop,
+                                modifier = Modifier.fillMaxSize().clip(RoundedCornerShape(14.dp))
+                            )
+                            Box(
+                                modifier = Modifier.fillMaxSize()
+                                    .background(Color.Black.copy(alpha = 0.25f), RoundedCornerShape(14.dp)),
+                                contentAlignment = Alignment.Center
+                            ) {
+                                Text("Tap to change", color = Color.White,
+                                    fontSize = 13.sp, fontWeight = FontWeight.Medium)
+                            }
+                        } else {
+                            Column(horizontalAlignment = Alignment.CenterHorizontally) {
+                                Text("📸", fontSize = 40.sp)
+                                Spacer(modifier = Modifier.height(8.dp))
+                                Text("Tap to upload a photo", fontSize = 14.sp,
+                                    color = Color(0xFF1A6B47), fontWeight = FontWeight.Medium)
+                                Spacer(modifier = Modifier.height(4.dp))
+                                Text("A photo is required to help identify the item",
+                                    fontSize = 11.sp, color = Color.Gray, textAlign = TextAlign.Center,
+                                    modifier = Modifier.padding(horizontal = 16.dp))
+                            }
+                        }
+                    }
+                }
+            }
+
+            Spacer(modifier = Modifier.height(16.dp))
+
+            // ── Item Details Card ─────────────────────────────────────────
+            Card(
+                shape = RoundedCornerShape(20.dp),
+                colors = CardDefaults.cardColors(containerColor = Color.White),
+                elevation = CardDefaults.cardElevation(0.dp),
+                modifier = Modifier.fillMaxWidth()
+            ) {
+                Column(modifier = Modifier.padding(20.dp)) {
+                    Row(verticalAlignment = Alignment.CenterVertically,
+                        modifier = Modifier.padding(bottom = 16.dp)) {
+                        Text("📋", fontSize = 20.sp)
+                        Spacer(modifier = Modifier.width(8.dp))
+                        Text("Item Details", fontSize = 16.sp,
+                            fontWeight = FontWeight.SemiBold, color = Color(0xFF0A3D2B))
+                    }
+                    OutlinedTextField(
+                        value = itemName, onValueChange = { itemName = it },
+                        label = { Text("Item Name *") },
+                        placeholder = { Text("e.g. Black Dell Laptop") },
+                        leadingIcon = { Text("🏷️", modifier = Modifier.padding(start = 4.dp)) },
+                        shape = RoundedCornerShape(12.dp),
+                        colors = OutlinedTextFieldDefaults.colors(
+                            focusedBorderColor = Color(0xFF1A6B47), unfocusedBorderColor = Color(0xFFE2E8F0)),
+                        modifier = Modifier.fillMaxWidth()
+                    )
+                    Spacer(modifier = Modifier.height(14.dp))
+                    ExposedDropdownMenuBox(
+                        expanded = categoryExpanded,
+                        onExpandedChange = { categoryExpanded = !categoryExpanded }
+                    ) {
+                        OutlinedTextField(
+                            value = category, onValueChange = {}, readOnly = true,
+                            label = { Text("Category *") },
+                            placeholder = { Text("Select a category") },
+                            leadingIcon = { Text("🗂️", modifier = Modifier.padding(start = 4.dp)) },
+                            trailingIcon = { ExposedDropdownMenuDefaults.TrailingIcon(expanded = categoryExpanded) },
+                            shape = RoundedCornerShape(12.dp),
+                            colors = OutlinedTextFieldDefaults.colors(
+                                focusedBorderColor = Color(0xFF1A6B47), unfocusedBorderColor = Color(0xFFE2E8F0)),
+                            modifier = Modifier.fillMaxWidth().menuAnchor()
+                        )
+                        ExposedDropdownMenu(expanded = categoryExpanded,
+                            onDismissRequest = { categoryExpanded = false }) {
+                            categories.forEach { option ->
+                                DropdownMenuItem(
+                                    text = { Text(option, fontSize = 14.sp) },
+                                    onClick = { category = option; categoryExpanded = false }
+                                )
+                            }
+                        }
+                    }
+                    Spacer(modifier = Modifier.height(14.dp))
+                    OutlinedTextField(
+                        value = description, onValueChange = { description = it },
+                        label = { Text("Description") },
+                        placeholder = { Text("Describe the item — color, brand, markings...") },
+                        leadingIcon = { Text("📝", modifier = Modifier.padding(start = 4.dp)) },
+                        shape = RoundedCornerShape(12.dp),
+                        minLines = 3, maxLines = 5,
+                        colors = OutlinedTextFieldDefaults.colors(
+                            focusedBorderColor = Color(0xFF1A6B47), unfocusedBorderColor = Color(0xFFE2E8F0)),
+                        modifier = Modifier.fillMaxWidth()
+                    )
+                }
+            }
+
+            Spacer(modifier = Modifier.height(16.dp))
+
+            // ── Location & Time Card ──────────────────────────────────────
+            Card(
+                shape = RoundedCornerShape(20.dp),
+                colors = CardDefaults.cardColors(containerColor = Color.White),
+                elevation = CardDefaults.cardElevation(0.dp),
+                modifier = Modifier.fillMaxWidth()
+            ) {
+                Column(modifier = Modifier.padding(20.dp)) {
+                    Row(verticalAlignment = Alignment.CenterVertically,
+                        modifier = Modifier.padding(bottom = 16.dp)) {
+                        Text("📍", fontSize = 20.sp)
+                        Spacer(modifier = Modifier.width(8.dp))
+                        Text("Where & When", fontSize = 16.sp,
+                            fontWeight = FontWeight.SemiBold, color = Color(0xFF0A3D2B))
+                    }
+                    OutlinedTextField(
+                        value = college, onValueChange = { college = it },
+                        label = { Text("College / Area") },
+                        placeholder = { Text("e.g. College of Engineering") },
+                        leadingIcon = { Text("🏛️", modifier = Modifier.padding(start = 4.dp)) },
+                        shape = RoundedCornerShape(12.dp),
+                        colors = OutlinedTextFieldDefaults.colors(
+                            focusedBorderColor = Color(0xFF1A6B47), unfocusedBorderColor = Color(0xFFE2E8F0)),
+                        modifier = Modifier.fillMaxWidth()
+                    )
+                    Spacer(modifier = Modifier.height(14.dp))
+                    OutlinedTextField(
+                        value = location, onValueChange = { location = it },
+                        label = { Text("Specific Location *") },
+                        placeholder = { Text("e.g. Library, Room 204, Cafeteria") },
+                        leadingIcon = { Text("📌", modifier = Modifier.padding(start = 4.dp)) },
+                        shape = RoundedCornerShape(12.dp),
+                        colors = OutlinedTextFieldDefaults.colors(
+                            focusedBorderColor = Color(0xFF1A6B47), unfocusedBorderColor = Color(0xFFE2E8F0)),
+                        modifier = Modifier.fillMaxWidth()
+                    )
+                    Spacer(modifier = Modifier.height(14.dp))
+                    OutlinedTextField(
+                        value = time, onValueChange = {}, readOnly = true,
+                        label = { Text("Time Found *") },
+                        placeholder = { Text("Tap to select time") },
+                        leadingIcon = { Text("⏰", modifier = Modifier.padding(start = 4.dp)) },
+                        trailingIcon = {
+                            IconButton(onClick = { showTimePicker = true }) {
+                                Icon(Icons.Default.Edit, contentDescription = "Pick time",
+                                    tint = Color(0xFF1A6B47), modifier = Modifier.size(18.dp))
+                            }
+                        },
+                        shape = RoundedCornerShape(12.dp),
+                        colors = OutlinedTextFieldDefaults.colors(
+                            focusedBorderColor = Color(0xFF1A6B47), unfocusedBorderColor = Color(0xFFE2E8F0)),
+                        modifier = Modifier.fillMaxWidth().clickable { showTimePicker = true }
+                    )
+                }
+            }
+
+            Spacer(modifier = Modifier.height(24.dp))
+
+            if (submitError.isNotEmpty()) {
+                Text(text = submitError, color = Color(0xFFE53935), fontSize = 13.sp,
+                    modifier = Modifier.padding(bottom = 12.dp))
+            }
+
+            // ── Submit Button ─────────────────────────────────────────────
+            Button(
+                onClick = {
+                    isSubmitting = true
+                    submitError = ""
+                    val db  = FirebaseFirestore.getInstance()
+                    val uid = FirebaseAuth.getInstance().currentUser?.uid
+
+                    val foundItem = hashMapOf(
+                        "itemName"    to itemName,
+                        "category"   to category,
+                        "college"    to college,
+                        "location"   to location,
+                        "timeFound"  to time,
+                        "description" to description,
+                        "imageUrl"   to (imageUri?.toString() ?: ""),
+                        "reportedBy" to uid,
+                        "timestamp"  to System.currentTimeMillis(),
+                        "status"     to "found"
+                    )
+
+                    db.collection("found_items")
+                        .add(foundItem)
+                        .addOnSuccessListener { isSubmitting = false; onSubmit() }
+                        .addOnFailureListener { e ->
+                            isSubmitting = false
+                            submitError = "❌ Failed to submit: ${e.message}"
+                        }
+                },
+                enabled = canSubmit && !isSubmitting,
+                modifier = Modifier.fillMaxWidth().height(56.dp),
+                shape = RoundedCornerShape(16.dp),
+                colors = ButtonDefaults.buttonColors(
+                    containerColor = Color(0xFF1A6B47), contentColor = Color.White,
+                    disabledContainerColor = Color(0xFF1A6B47).copy(alpha = 0.4f)
+                ),
+                elevation = ButtonDefaults.buttonElevation(defaultElevation = 4.dp)
+            ) {
+                if (isSubmitting) {
+                    CircularProgressIndicator(modifier = Modifier.size(22.dp),
+                        color = Color.White, strokeWidth = 2.5.dp)
+                } else {
+                    Text("Submit Found Report", fontSize = 16.sp, fontWeight = FontWeight.Bold)
+                }
+            }
+
+            Spacer(modifier = Modifier.height(8.dp))
+            Text("* Required fields", fontSize = 11.sp, color = Color.Gray,
+                modifier = Modifier.align(Alignment.End))
+        }
+    }
+}
+
+// ─── Found Item Card ──────────────────────────────────────────────────────────
+@OptIn(ExperimentalMaterial3Api::class)
+@Composable
+fun FoundItemCard(item: FoundItemData) {
+    val emoji = categoryEmoji(item.category)
+    val formattedTime = remember(item.timestamp) {
+        if (item.timestamp > 0) {
+            val sdf = java.text.SimpleDateFormat("MMM d, yyyy", java.util.Locale.getDefault())
+            sdf.format(java.util.Date(item.timestamp))
+        } else "Unknown date"
+    }
+
+    var showContactSheet by remember { mutableStateOf(false) }
+    var contactName      by remember { mutableStateOf("") }
+    var contactEmail     by remember { mutableStateOf("") }
+    var contactPhone     by remember { mutableStateOf("") }
+    var contactStudentId by remember { mutableStateOf("") }
+    var contactRole      by remember { mutableStateOf("") }
+    var isLoadingContact by remember { mutableStateOf(false) }
+    var contactError     by remember { mutableStateOf("") }
+
+    val db = FirebaseFirestore.getInstance()
+    val sheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true)
+
+    if (showContactSheet) {
+        ModalBottomSheet(
+            onDismissRequest = { showContactSheet = false },
+            sheetState = sheetState,
+            containerColor = Color.White,
+            shape = RoundedCornerShape(topStart = 28.dp, topEnd = 28.dp)
+        ) {
+            Column(
+                modifier = Modifier.fillMaxWidth().padding(horizontal = 24.dp).padding(bottom = 40.dp),
+                horizontalAlignment = Alignment.CenterHorizontally
+            ) {
+                Box(
+                    modifier = Modifier.size(64.dp)
+                        .background(Brush.linearGradient(listOf(Color(0xFF0A3D2B), Color(0xFF1A6B47))), CircleShape),
+                    contentAlignment = Alignment.Center
+                ) {
+                    Text(
+                        text = contactName.split(" ").filter { it.isNotEmpty() }.take(2)
+                            .joinToString("") { it.first().uppercase() }.ifEmpty { "?" },
+                        color = Color.White, fontSize = 22.sp, fontWeight = FontWeight.Bold
+                    )
+                }
+                Spacer(modifier = Modifier.height(12.dp))
+                Text(contactName.ifEmpty { "Unknown User" }, fontSize = 20.sp,
+                    fontWeight = FontWeight.ExtraBold, color = Color(0xFF0A3D2B))
+                if (contactRole.isNotEmpty()) {
+                    Text(contactRole, fontSize = 13.sp, color = Color(0xFF5B6E8C))
+                }
+                Spacer(modifier = Modifier.height(6.dp))
+                Box(
+                    modifier = Modifier.background(Color(0xFFECF8F2), RoundedCornerShape(50))
+                        .padding(horizontal = 14.dp, vertical = 6.dp)
+                ) {
+                    Text("Found: ${item.itemName}", fontSize = 12.sp,
+                        color = Color(0xFF1A6B47), fontWeight = FontWeight.SemiBold)
+                }
+                Spacer(modifier = Modifier.height(24.dp))
+
+                when {
+                    isLoadingContact -> {
+                        CircularProgressIndicator(color = Color(0xFF1A6B47), strokeWidth = 3.dp)
+                        Spacer(modifier = Modifier.height(12.dp))
+                        Text("Fetching contact details...", fontSize = 13.sp, color = Color(0xFF5B6E8C))
+                    }
+                    contactError.isNotEmpty() -> {
+                        Text("⚠️", fontSize = 32.sp)
+                        Spacer(modifier = Modifier.height(8.dp))
+                        Text(contactError, fontSize = 13.sp, color = Color(0xFFE53935), textAlign = TextAlign.Center)
+                    }
+                    else -> {
+                        if (contactEmail.isNotEmpty()) {
+                            ContactDetailRow(icon = "📧", label = "Email Address", value = contactEmail,
+                                actionLabel = "Send Email", actionColor = Color(0xFF2C7DA0))
+                            Spacer(modifier = Modifier.height(12.dp))
+                        }
+                        if (contactPhone.isNotEmpty()) {
+                            ContactDetailRow(icon = "📞", label = "Phone Number", value = contactPhone,
+                                actionLabel = "Call", actionColor = Color(0xFF2E7D32))
+                            Spacer(modifier = Modifier.height(12.dp))
+                        }
+                        if (contactStudentId.isNotEmpty()) {
+                            ContactDetailRow(icon = "🎓", label = "Student Email", value = contactStudentId,
+                                actionLabel = null, actionColor = Color.Gray)
+                            Spacer(modifier = Modifier.height(12.dp))
+                        }
+                        if (contactEmail.isEmpty() && contactPhone.isEmpty()) {
+                            Text("⚠️ This user hasn't added contact details yet.",
+                                fontSize = 13.sp, color = Color(0xFF5B6E8C), textAlign = TextAlign.Center)
+                        }
+                    }
+                }
+                Spacer(modifier = Modifier.height(20.dp))
+                OutlinedButton(
+                    onClick = { showContactSheet = false },
+                    modifier = Modifier.fillMaxWidth().height(50.dp),
+                    shape = RoundedCornerShape(50),
+                    border = BorderStroke(1.5.dp, Color(0xFFDDE3F0)),
+                    colors = ButtonDefaults.outlinedButtonColors(contentColor = Color(0xFF5B6E8C))
+                ) { Text("Close", fontWeight = FontWeight.SemiBold) }
+            }
+        }
+    }
+
+    Card(
+        shape = RoundedCornerShape(20.dp),
+        modifier = Modifier.fillMaxWidth(),
+        colors = CardDefaults.cardColors(containerColor = Color.White),
+        elevation = CardDefaults.cardElevation(defaultElevation = 2.dp)
+    ) {
+        Column {
+            Box(
+                modifier = Modifier.fillMaxWidth().height(200.dp)
+                    .clip(RoundedCornerShape(topStart = 20.dp, topEnd = 20.dp))
+            ) {
+                if (item.imageUrl.isNotEmpty()) {
+                    androidx.compose.foundation.Image(
+                        painter = rememberAsyncImagePainter(item.imageUrl),
+                        contentDescription = item.itemName,
+                        contentScale = androidx.compose.ui.layout.ContentScale.Crop,
+                        modifier = Modifier.fillMaxSize()
+                    )
+                } else {
+                    Box(
+                        modifier = Modifier.fillMaxSize()
+                            .background(Brush.linearGradient(colors = listOf(Color(0xFFD4EDE1), Color(0xFFECF8F2)))),
+                        contentAlignment = Alignment.Center
+                    ) {
+                        Column(horizontalAlignment = Alignment.CenterHorizontally) {
+                            Text(emoji, fontSize = 72.sp)
+                            Spacer(modifier = Modifier.height(4.dp))
+                            Text(item.category.substringAfter(" ").ifEmpty { item.category },
+                                fontSize = 12.sp, color = Color(0xFF1A6B47), fontWeight = FontWeight.Medium)
+                        }
+                    }
+                }
+                // FOUND badge
+                Box(
+                    modifier = Modifier.align(Alignment.TopEnd).padding(10.dp)
+                        .background(Color(0xFF1A6B47), RoundedCornerShape(50))
+                        .padding(horizontal = 10.dp, vertical = 4.dp)
+                ) {
+                    Text("FOUND", color = Color.White, fontSize = 11.sp,
+                        fontWeight = FontWeight.ExtraBold, letterSpacing = 1.sp)
+                }
+            }
+
+            Column(modifier = Modifier.padding(14.dp)) {
+                Text(item.itemName.ifEmpty { "Unnamed Item" },
+                    fontWeight = FontWeight.ExtraBold, fontSize = 18.sp, color = Color(0xFF0A3D2B))
+                if (item.description.isNotEmpty()) {
+                    Spacer(modifier = Modifier.height(4.dp))
+                    Text(item.description, fontSize = 13.sp, color = Color(0xFF5B6E8C),
+                        maxLines = 2, overflow = androidx.compose.ui.text.style.TextOverflow.Ellipsis)
+                }
+                Spacer(modifier = Modifier.height(10.dp))
+                Row(horizontalArrangement = Arrangement.spacedBy(12.dp)) {
+                    if (item.location.isNotEmpty()) {
+                        Row(verticalAlignment = Alignment.CenterVertically) {
+                            Text("📍", fontSize = 12.sp)
+                            Spacer(modifier = Modifier.width(3.dp))
+                            Text(item.location, fontSize = 12.sp, color = Color(0xFF5B6E8C),
+                                maxLines = 1, overflow = androidx.compose.ui.text.style.TextOverflow.Ellipsis,
+                                modifier = Modifier.widthIn(max = 110.dp))
+                        }
+                    }
+                    if (item.timeFound.isNotEmpty()) {
+                        Row(verticalAlignment = Alignment.CenterVertically) {
+                            Text("⏰", fontSize = 12.sp)
+                            Spacer(modifier = Modifier.width(3.dp))
+                            Text(item.timeFound, fontSize = 12.sp, color = Color(0xFF5B6E8C))
+                        }
+                    }
+                }
+                Spacer(modifier = Modifier.height(4.dp))
+                Row(verticalAlignment = Alignment.CenterVertically) {
+                    Text("📅", fontSize = 12.sp)
+                    Spacer(modifier = Modifier.width(3.dp))
+                    Text(formattedTime, fontSize = 12.sp, color = Color(0xFF5B6E8C))
+                }
+                if (item.college.isNotEmpty()) {
+                    Spacer(modifier = Modifier.height(4.dp))
+                    Row(verticalAlignment = Alignment.CenterVertically) {
+                        Text("🏛️", fontSize = 12.sp)
+                        Spacer(modifier = Modifier.width(3.dp))
+                        Text(item.college, fontSize = 12.sp, color = Color(0xFF5B6E8C),
+                            maxLines = 1, overflow = androidx.compose.ui.text.style.TextOverflow.Ellipsis)
+                    }
+                }
+                Spacer(modifier = Modifier.height(12.dp))
+                Button(
+                    onClick = {
+                        showContactSheet = true
+                        if (contactName.isEmpty() && contactError.isEmpty()) {
+                            isLoadingContact = true
+                            if (item.reportedBy.isEmpty()) {
+                                isLoadingContact = false
+                                contactError = "No finder information linked to this item."
+                            } else {
+                                db.collection("users").document(item.reportedBy).get()
+                                    .addOnSuccessListener { doc ->
+                                        isLoadingContact = false
+                                        if (doc.exists()) {
+                                            contactName      = doc.getString("name")      ?: ""
+                                            contactEmail     = doc.getString("email")     ?: ""
+                                            contactPhone     = doc.getString("phone")     ?: ""
+                                            contactStudentId = doc.getString("studentId") ?: ""
+                                            contactRole      = doc.getString("role")      ?: ""
+                                        } else { contactError = "Finder profile not found." }
+                                    }
+                                    .addOnFailureListener { e ->
+                                        isLoadingContact = false
+                                        contactError = "Failed to load contact: ${e.message}"
+                                    }
+                            }
+                        }
+                    },
+                    modifier = Modifier.fillMaxWidth().height(42.dp),
+                    shape = RoundedCornerShape(50),
+                    colors = ButtonDefaults.buttonColors(
+                        containerColor = Color(0xFF0A3D2B), contentColor = Color.White),
+                    elevation = ButtonDefaults.buttonElevation(defaultElevation = 2.dp)
+                ) {
+                    Text("Contact Finder", fontSize = 14.sp, fontWeight = FontWeight.Bold)
+                }
+            }
+        }
+    }
+}
 
 // ─── Account Screen ───────────────────────────────────────────────────────────
 @OptIn(ExperimentalMaterial3Api::class)
