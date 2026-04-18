@@ -830,6 +830,7 @@ fun LostScreen(
 }
 
 // ─── Lost Item Card (dynamic) ─────────────────────────────────────────────────
+@OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun LostItemCard(item: LostItemData) {
     val emoji = categoryEmoji(item.category)
@@ -838,6 +839,164 @@ fun LostItemCard(item: LostItemData) {
             val sdf = java.text.SimpleDateFormat("MMM d, yyyy", java.util.Locale.getDefault())
             sdf.format(java.util.Date(item.timestamp))
         } else "Unknown date"
+    }
+
+    // ── Contact sheet state ───────────────────────────────────────────────
+    var showContactSheet   by remember { mutableStateOf(false) }
+    var contactName        by remember { mutableStateOf("") }
+    var contactEmail       by remember { mutableStateOf("") }
+    var contactPhone       by remember { mutableStateOf("") }
+    var contactStudentId   by remember { mutableStateOf("") }
+    var contactRole        by remember { mutableStateOf("") }
+    var isLoadingContact   by remember { mutableStateOf(false) }
+    var contactError       by remember { mutableStateOf("") }
+
+    val db = FirebaseFirestore.getInstance()
+    val sheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true)
+
+    // ── Bottom Sheet ──────────────────────────────────────────────────────
+    if (showContactSheet) {
+        ModalBottomSheet(
+            onDismissRequest = { showContactSheet = false },
+            sheetState = sheetState,
+            containerColor = Color.White,
+            shape = RoundedCornerShape(topStart = 28.dp, topEnd = 28.dp)
+        ) {
+            Column(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(horizontal = 24.dp)
+                    .padding(bottom = 40.dp),
+                horizontalAlignment = Alignment.CenterHorizontally
+            ) {
+                // Header
+                Box(
+                    modifier = Modifier
+                        .size(64.dp)
+                        .background(
+                            Brush.linearGradient(listOf(Color(0xFF1A5C8A), Color(0xFF2C7DA0))),
+                            CircleShape
+                        ),
+                    contentAlignment = Alignment.Center
+                ) {
+                    Text(
+                        text = contactName.split(" ").filter { it.isNotEmpty() }.take(2)
+                            .joinToString("") { it.first().uppercase() }
+                            .ifEmpty { "?" },
+                        color = Color.White,
+                        fontSize = 22.sp,
+                        fontWeight = FontWeight.Bold
+                    )
+                }
+
+                Spacer(modifier = Modifier.height(12.dp))
+
+                Text(
+                    text = contactName.ifEmpty { "Unknown User" },
+                    fontSize = 20.sp,
+                    fontWeight = FontWeight.ExtraBold,
+                    color = Color(0xFF0F3B5C)
+                )
+
+                if (contactRole.isNotEmpty()) {
+                    Text(
+                        text = contactRole,
+                        fontSize = 13.sp,
+                        color = Color(0xFF5B6E8C)
+                    )
+                }
+
+                Spacer(modifier = Modifier.height(6.dp))
+
+                // Item context pill
+                Box(
+                    modifier = Modifier
+                        .background(Color(0xFFEEF4FB), RoundedCornerShape(50))
+                        .padding(horizontal = 14.dp, vertical = 6.dp)
+                ) {
+                    Text(
+                        "Owner of: ${item.itemName}",
+                        fontSize = 12.sp,
+                        color = Color(0xFF1A5C8A),
+                        fontWeight = FontWeight.SemiBold
+                    )
+                }
+
+                Spacer(modifier = Modifier.height(24.dp))
+
+                when {
+                    isLoadingContact -> {
+                        CircularProgressIndicator(color = Color(0xFF2C7DA0), strokeWidth = 3.dp)
+                        Spacer(modifier = Modifier.height(12.dp))
+                        Text("Fetching contact details...", fontSize = 13.sp, color = Color(0xFF5B6E8C))
+                    }
+
+                    contactError.isNotEmpty() -> {
+                        Text("⚠️", fontSize = 32.sp)
+                        Spacer(modifier = Modifier.height(8.dp))
+                        Text(contactError, fontSize = 13.sp, color = Color(0xFFE53935), textAlign = TextAlign.Center)
+                    }
+
+                    else -> {
+                        // Contact detail cards
+                        if (contactEmail.isNotEmpty()) {
+                            ContactDetailRow(
+                                icon = "📧",
+                                label = "Email Address",
+                                value = contactEmail,
+                                actionLabel = "Send Email",
+                                actionColor = Color(0xFF2C7DA0)
+                            )
+                            Spacer(modifier = Modifier.height(12.dp))
+                        }
+
+                        if (contactPhone.isNotEmpty()) {
+                            ContactDetailRow(
+                                icon = "📞",
+                                label = "Phone Number",
+                                value = contactPhone,
+                                actionLabel = "Call",
+                                actionColor = Color(0xFF2E7D32)
+                            )
+                            Spacer(modifier = Modifier.height(12.dp))
+                        }
+
+                        if (contactStudentId.isNotEmpty()) {
+                            ContactDetailRow(
+                                icon = "🎓",
+                                label = "Student Email",
+                                value = contactStudentId,
+                                actionLabel = null,
+                                actionColor = Color.Gray
+                            )
+                            Spacer(modifier = Modifier.height(12.dp))
+                        }
+
+                        if (contactEmail.isEmpty() && contactPhone.isEmpty()) {
+                            Text(
+                                "⚠️ This user hasn't added contact details yet.",
+                                fontSize = 13.sp,
+                                color = Color(0xFF5B6E8C),
+                                textAlign = TextAlign.Center
+                            )
+                        }
+                    }
+                }
+
+                Spacer(modifier = Modifier.height(20.dp))
+
+                // Close button
+                OutlinedButton(
+                    onClick = { showContactSheet = false },
+                    modifier = Modifier.fillMaxWidth().height(50.dp),
+                    shape = RoundedCornerShape(50),
+                    border = BorderStroke(1.5.dp, Color(0xFFDDE3F0)),
+                    colors = ButtonDefaults.outlinedButtonColors(contentColor = Color(0xFF5B6E8C))
+                ) {
+                    Text("Close", fontWeight = FontWeight.SemiBold)
+                }
+            }
+        }
     }
 
     Card(
@@ -862,15 +1021,10 @@ fun LostItemCard(item: LostItemData) {
                         modifier = Modifier.fillMaxSize()
                     )
                 } else {
-                    // Gradient avatar with emoji
                     Box(
                         modifier = Modifier
                             .fillMaxSize()
-                            .background(
-                                Brush.linearGradient(
-                                    colors = listOf(Color(0xFFDCEAF7), Color(0xFFEEF4FB))
-                                )
-                            ),
+                            .background(Brush.linearGradient(colors = listOf(Color(0xFFDCEAF7), Color(0xFFEEF4FB)))),
                         contentAlignment = Alignment.Center
                     ) {
                         Column(horizontalAlignment = Alignment.CenterHorizontally) {
@@ -878,14 +1032,11 @@ fun LostItemCard(item: LostItemData) {
                             Spacer(modifier = Modifier.height(4.dp))
                             Text(
                                 item.category.substringAfter(" ").ifEmpty { item.category },
-                                fontSize = 12.sp,
-                                color = Color(0xFF5B6E8C),
-                                fontWeight = FontWeight.Medium
+                                fontSize = 12.sp, color = Color(0xFF5B6E8C), fontWeight = FontWeight.Medium
                             )
                         }
                     }
                 }
-                // LOST badge overlay
                 Box(
                     modifier = Modifier
                         .align(Alignment.TopEnd)
@@ -901,25 +1052,16 @@ fun LostItemCard(item: LostItemData) {
             Column(modifier = Modifier.padding(14.dp)) {
                 Text(
                     item.itemName.ifEmpty { "Unnamed Item" },
-                    fontWeight = FontWeight.ExtraBold,
-                    fontSize = 18.sp,
-                    color = Color(0xFF0F3B5C)
+                    fontWeight = FontWeight.ExtraBold, fontSize = 18.sp, color = Color(0xFF0F3B5C)
                 )
-
                 if (item.description.isNotEmpty()) {
                     Spacer(modifier = Modifier.height(4.dp))
                     Text(
-                        item.description,
-                        fontSize = 13.sp,
-                        color = Color(0xFF5B6E8C),
-                        maxLines = 2,
-                        overflow = androidx.compose.ui.text.style.TextOverflow.Ellipsis
+                        item.description, fontSize = 13.sp, color = Color(0xFF5B6E8C),
+                        maxLines = 2, overflow = androidx.compose.ui.text.style.TextOverflow.Ellipsis
                     )
                 }
-
                 Spacer(modifier = Modifier.height(10.dp))
-
-                // Meta info row
                 Row(horizontalArrangement = Arrangement.spacedBy(12.dp)) {
                     if (item.location.isNotEmpty()) {
                         Row(verticalAlignment = Alignment.CenterVertically) {
@@ -938,14 +1080,12 @@ fun LostItemCard(item: LostItemData) {
                         }
                     }
                 }
-
                 Spacer(modifier = Modifier.height(4.dp))
                 Row(verticalAlignment = Alignment.CenterVertically) {
                     Text("📅", fontSize = 12.sp)
                     Spacer(modifier = Modifier.width(3.dp))
                     Text(formattedTime, fontSize = 12.sp, color = Color(0xFF5B6E8C))
                 }
-
                 if (item.college.isNotEmpty()) {
                     Spacer(modifier = Modifier.height(4.dp))
                     Row(verticalAlignment = Alignment.CenterVertically) {
@@ -955,11 +1095,40 @@ fun LostItemCard(item: LostItemData) {
                             maxLines = 1, overflow = androidx.compose.ui.text.style.TextOverflow.Ellipsis)
                     }
                 }
-
                 Spacer(modifier = Modifier.height(12.dp))
 
                 Button(
-                    onClick = { },
+                    onClick = {
+                        showContactSheet = true
+                        // Only fetch if not already loaded
+                        if (contactName.isEmpty() && contactError.isEmpty()) {
+                            isLoadingContact = true
+                            contactError = ""
+                            if (item.reportedBy.isNullOrEmpty()) {
+                                isLoadingContact = false
+                                contactError = "No owner information linked to this item."
+                            } else {
+                                db.collection("users").document(item.reportedBy)
+                                    .get()
+                                    .addOnSuccessListener { doc ->
+                                        isLoadingContact = false
+                                        if (doc.exists()) {
+                                            contactName      = doc.getString("name")      ?: ""
+                                            contactEmail     = doc.getString("email")     ?: ""
+                                            contactPhone     = doc.getString("phone")     ?: ""
+                                            contactStudentId = doc.getString("studentId") ?: ""
+                                            contactRole      = doc.getString("role")      ?: ""
+                                        } else {
+                                            contactError = "Owner profile not found."
+                                        }
+                                    }
+                                    .addOnFailureListener { e ->
+                                        isLoadingContact = false
+                                        contactError = "Failed to load contact: ${e.message}"
+                                    }
+                            }
+                        }
+                    },
                     modifier = Modifier.fillMaxWidth().height(42.dp),
                     shape = RoundedCornerShape(50),
                     colors = ButtonDefaults.buttonColors(
@@ -975,6 +1144,39 @@ fun LostItemCard(item: LostItemData) {
     }
 }
 
+// ── Contact Detail Row ────────────────────────────────────────────────────────
+@Composable
+fun ContactDetailRow(
+    icon: String,
+    label: String,
+    value: String,
+    actionLabel: String?,
+    actionColor: Color
+) {
+    Row(
+        modifier = Modifier
+            .fillMaxWidth()
+            .background(Color(0xFFF8FAFC), RoundedCornerShape(14.dp))
+            .padding(horizontal = 16.dp, vertical = 12.dp),
+        verticalAlignment = Alignment.CenterVertically
+    ) {
+        Text(icon, fontSize = 20.sp, modifier = Modifier.width(36.dp))
+        Column(modifier = Modifier.weight(1f)) {
+            Text(label, fontSize = 11.sp, color = Color(0xFF8A99B4), fontWeight = FontWeight.Medium)
+            Spacer(modifier = Modifier.height(2.dp))
+            Text(value, fontSize = 14.sp, color = Color(0xFF0F3B5C), fontWeight = FontWeight.SemiBold)
+        }
+        if (actionLabel != null) {
+            Box(
+                modifier = Modifier
+                    .background(actionColor.copy(alpha = 0.1f), RoundedCornerShape(50))
+                    .padding(horizontal = 10.dp, vertical = 5.dp)
+            ) {
+                Text(actionLabel, fontSize = 11.sp, color = actionColor, fontWeight = FontWeight.Bold)
+            }
+        }
+    }
+}
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun ReportLostItemScreen(
