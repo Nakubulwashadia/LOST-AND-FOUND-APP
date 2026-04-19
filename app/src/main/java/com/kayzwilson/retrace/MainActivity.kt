@@ -1779,11 +1779,12 @@ fun FoundScreen(onNavigateToLost: () -> Unit, onNavigateToAccount: () -> Unit, o
             }
         }
 
+        // ✅ Correct
         BottomNavBar(
             activeTab = NavTab.FOUND,
             onNavigateToLost = onNavigateToLost,
             onNavigateToFound = { },
-            onNavigateToAccount = { }
+            onNavigateToAccount = onNavigateToAccount  // ← pass it through
         )
     }
 }
