@@ -1,30 +1,16 @@
 plugins {
-<<<<<<< HEAD
-     alias(libs.plugins.android.application)
-     alias(libs.plugins.kotlin.compose)
-     alias(libs.plugins.google.services)
- }
-=======
     alias(libs.plugins.android.application)
-    alias(libs.plugins.kotlin.compose)
+    alias(libs.plugins.kotlin.android)
+    alias(libs.plugins.google.services)
 }
->>>>>>> 9bf0bbbc3f714c0e3cfa7bf6a149e9dc653e9bb9
 
 android {
-    namespace = "com.kayzwilson.retrace"
-    compileSdk {
-        version = release(36) {
-            minorApiLevel = 1
-        }
-    }
+    namespace = "com.example.retrace"
+    compileSdk = 36 // Standardized for SDK 36
 
     defaultConfig {
         applicationId = "com.kayzwilson.retrace"
-<<<<<<< HEAD
-        minSdk = 34
-=======
-        minSdk = 25
->>>>>>> 9bf0bbbc3f714c0e3cfa7bf6a149e9dc653e9bb9
+        minSdk = 25 // Set to 25 to support more devices, or 34 if you need specific new features
         targetSdk = 36
         versionCode = 1
         versionName = "1.0"
@@ -48,6 +34,9 @@ android {
     buildFeatures {
         compose = true
     }
+    composeOptions {
+        kotlinCompilerExtensionVersion = "1.5.10" // This version works with Kotlin 1.9.22
+    }
 }
 
 dependencies {
@@ -59,25 +48,20 @@ dependencies {
     implementation(libs.androidx.compose.ui.graphics)
     implementation(libs.androidx.compose.ui.tooling.preview)
     implementation(libs.androidx.compose.material3)
-<<<<<<< HEAD
-    implementation(platform("com.google.firebase:firebase-bom:34.11.0"))
+
+    // Firebase and Image Loading
+    implementation(platform("com.google.firebase:firebase-bom:33.1.0")) // Updated to a stable BOM version
     implementation("com.google.firebase:firebase-analytics")
     implementation("com.google.firebase:firebase-firestore-ktx")
     implementation("com.google.firebase:firebase-storage-ktx")
     implementation("io.coil-kt:coil-compose:2.5.0")
-    implementation("androidx.compose.material3:material3:1.2.0")
     implementation("androidx.compose.material:material-icons-extended:1.6.0")
-=======
->>>>>>> 9bf0bbbc3f714c0e3cfa7bf6a149e9dc653e9bb9
+
     testImplementation(libs.junit)
     androidTestImplementation(libs.androidx.junit)
     androidTestImplementation(libs.androidx.espresso.core)
     androidTestImplementation(platform(libs.androidx.compose.bom))
     androidTestImplementation(libs.androidx.compose.ui.test.junit4)
-    debugImplementation(libs.androidx.compose.ui.tooling)
+    debugImplementation(libs.androidx.compose.ui.tooling.preview)
     debugImplementation(libs.androidx.compose.ui.test.manifest)
-<<<<<<< HEAD
-
-=======
->>>>>>> 9bf0bbbc3f714c0e3cfa7bf6a149e9dc653e9bb9
 }
