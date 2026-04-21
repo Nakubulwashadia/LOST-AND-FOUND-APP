@@ -602,6 +602,140 @@ fun categoryEmoji(category: String): String = when {
     else -> "📦"
 }
 
+// ─── Cloudinary Image Upload ──────────────────────────────────────────────────
+fun uploadImageToCloudinary(
+    context: android.content.Context,
+    imageUri: android.net.Uri,
+    folder: String,
+    onSuccess: (String) -> Unit,
+    onFailure: (String) -> Unit
+) {
+    val cloudName    = "dchc83kzl"     // ← replace this
+    val uploadPreset = "retrace_uploads"  // ← replace this e.g. retrace_uploads
+
+    val inputStream = context.contentResolver.openInputStream(imageUri)
+    val bytes = inputStream?.readBytes()
+    inputStream?.close()
+
+    if (bytes == null) {
+        onFailure("Could not read image file")
+        return
+    }
+
+    Thread {
+        try {
+            val boundary = "Boundary-${System.currentTimeMillis()}"
+            val url = java.net.URL("https://api.cloudinary.com/v1_1/$cloudName/image/upload")
+            val connection = url.openConnection() as java.net.HttpURLConnection
+            connection.requestMethod = "POST"
+            connection.doOutput = true
+            connection.setRequestProperty("Content-Type", "multipart/form-data; boundary=$boundary")
+
+            val outputStream = connection.outputStream
+            val writer = java.io.PrintStream(outputStream)
+
+            // upload_preset field
+            writer.print("--$boundary\r\n")
+            writer.print("Content-Disposition: form-data; name=\"upload_preset\"\r\n\r\n")
+            writer.print("$uploadPreset\r\n")
+
+            // folder field
+            writer.print("--$boundary\r\n")
+            writer.print("Content-Disposition: form-data; name=\"folder\"\r\n\r\n")
+            writer.print("$folder\r\n")
+
+            // image bytes
+            writer.print("--$boundary\r\n")
+            writer.print("Content-Disposition: form-data; name=\"file\"; filename=\"image.jpg\"\r\n")
+            writer.print("Content-Type: image/jpeg\r\n\r\n")
+            writer.flush()
+            outputStream.write(bytes)
+            outputStream.flush()
+            writer.print("\r\n--$boundary--\r\n")
+            writer.flush()
+
+            val responseCode = connection.responseCode
+            val response = if (responseCode == 200) {
+                connection.inputStream.bufferedReader().readText()
+            } else {
+                connection.errorStream?.bufferedReader()?.readText() ?: "Unknown error"
+            }
+            connection.disconnect()
+
+            if (responseCode == 200) {
+                val secureUrl = response
+                    .substringAfter("\"secure_url\":\"")
+                    .substringBefore("\"")
+                onSuccess(secureUrl)
+            } else {
+                onFailure("Upload failed: $response")
+            }
+        } catch (e: Exception) {
+            onFailure("Upload error: ${e.message}")
+        }
+    }.start()
+}
+
+// ─── Save Lost Item to Firestore ──────────────────────────────────────────────
+fun saveLostItem(
+    db: FirebaseFirestore,
+    uid: String?,
+    itemName: String,
+    category: String,
+    college: String,
+    location: String,
+    time: String,
+    description: String,
+    imageUrl: String,
+    onDone: () -> Unit
+) {
+    val lostItem = hashMapOf(
+        "itemName"    to itemName,
+        "category"   to category,
+        "college"    to college,
+        "location"   to location,
+        "timeLost"   to time,
+        "description" to description,
+        "imageUrl"   to imageUrl,
+        "reportedBy" to uid,
+        "timestamp"  to System.currentTimeMillis(),
+        "status"     to "lost"
+    )
+    db.collection("lost_items").add(lostItem)
+        .addOnSuccessListener { onDone() }
+        .addOnFailureListener { onDone() }
+}
+
+// ─── Save Found Item to Firestore ─────────────────────────────────────────────
+fun saveFoundItem(
+    db: FirebaseFirestore,
+    uid: String?,
+    itemName: String,
+    category: String,
+    college: String,
+    location: String,
+    time: String,
+    description: String,
+    imageUrl: String,
+    onDone: () -> Unit
+) {
+    val foundItem = hashMapOf(
+        "itemName"    to itemName,
+        "category"   to category,
+        "college"    to college,
+        "location"   to location,
+        "timeFound"  to time,
+        "description" to description,
+        "imageUrl"   to imageUrl,
+        "reportedBy" to uid,
+        "timestamp"  to System.currentTimeMillis(),
+        "status"     to "found"
+    )
+    db.collection("found_items").add(foundItem)
+        .addOnSuccessListener { onDone() }
+        .addOnFailureListener { onDone() }
+}
+
 // ─── Lost Screen ─────────────────────────────────────────────────────────────
 @Composable
 fun LostScreen(
@@ -1230,6 +1364,8 @@ fun ReportLostItemScreen(
     val canSubmit = itemName.isNotBlank() && category.isNotBlank() &&
             location.isNotBlank() && time.isNotBlank()
 
+    val context = androidx.compose.ui.platform.LocalContext.current
+
     // ── Time picker dialog ───────────────────────────────────────────────
     if (showTimePicker) {
         AlertDialog(
@@ -1523,33 +1659,34 @@ fun ReportLostItemScreen(
             Button(
                 onClick = {
                     isSubmitting = true
-                    submitError  = ""
+                    submitError = ""
                     val db  = FirebaseFirestore.getInstance()
                     val uid = FirebaseAuth.getInstance().currentUser?.uid
 
-                    val lostItem = hashMapOf(
-                        "itemName"    to itemName,
-                        "category"   to category,
-                        "college"    to college,
-                        "location"   to location,
-                        "timeLost"   to time,
-                        "description" to description,
-                        "imageUrl"   to (imageUri?.toString() ?: ""),
-                        "reportedBy" to uid,
-                        "timestamp"  to System.currentTimeMillis(),
-                        "status"     to "lost"
-                    )
-
-                    db.collection("lost_items")
-                        .add(lostItem)
-                        .addOnSuccessListener {
+                    if (imageUri != null) {
+                        uploadImageToCloudinary(
+                            context  = context,
+                            imageUri = imageUri!!,
+                            folder   = "lost_items",
+                            onSuccess = { imageUrl ->
+                                saveLostItem(db, uid, itemName, category, college,
+                                    location, time, description, imageUrl) {
+                                    isSubmitting = false
+                                    onSubmit()
+                                }
+                            },
+                            onFailure = { error ->
+                                isSubmitting = false
+                                submitError = "❌ $error"
+                            }
+                        )
+                    } else {
+                        saveLostItem(db, uid, itemName, category, college,
+                            location, time, description, "") {
                             isSubmitting = false
                             onSubmit()
                         }
-                        .addOnFailureListener { e ->
-                            isSubmitting = false
-                            submitError = "❌ Failed to submit: ${e.message}"
-                        }
+                    }
                 },
                 enabled = canSubmit && !isSubmitting,
                 modifier = Modifier.fillMaxWidth().height(56.dp),
@@ -1562,11 +1699,8 @@ fun ReportLostItemScreen(
                 elevation = ButtonDefaults.buttonElevation(defaultElevation = 4.dp)
             ) {
                 if (isSubmitting) {
-                    CircularProgressIndicator(
-                        modifier  = Modifier.size(22.dp),
-                        color     = Color.White,
-                        strokeWidth = 2.5.dp
-                    )
+                    CircularProgressIndicator(modifier = Modifier.size(22.dp),
+                        color = Color.White, strokeWidth = 2.5.dp)
                 } else {
                     Text("Submit Lost Report", fontSize = 16.sp, fontWeight = FontWeight.Bold)
                 }
@@ -1820,6 +1954,8 @@ fun ReportFoundItemScreen(onSubmit: () -> Unit, onBack: () -> Unit) {
     // Image is mandatory here
     val canSubmit = itemName.isNotBlank() && category.isNotBlank() &&
             location.isNotBlank() && time.isNotBlank() && imageUri != null
+
+    val context = androidx.compose.ui.platform.LocalContext.current
 
     if (showTimePicker) {
         AlertDialog(
@@ -2076,32 +2212,30 @@ fun ReportFoundItemScreen(onSubmit: () -> Unit, onBack: () -> Unit) {
                     val db  = FirebaseFirestore.getInstance()
                     val uid = FirebaseAuth.getInstance().currentUser?.uid
 
-                    val foundItem = hashMapOf(
-                        "itemName"    to itemName,
-                        "category"   to category,
-                        "college"    to college,
-                        "location"   to location,
-                        "timeFound"  to time,
-                        "description" to description,
-                        "imageUrl"   to (imageUri?.toString() ?: ""),
-                        "reportedBy" to uid,
-                        "timestamp"  to System.currentTimeMillis(),
-                        "status"     to "found"
-                    )
-
-                    db.collection("found_items")
-                        .add(foundItem)
-                        .addOnSuccessListener { isSubmitting = false; onSubmit() }
-                        .addOnFailureListener { e ->
+                    // Image is mandatory on found form so imageUri is never null here
+                    uploadImageToCloudinary(
+                        context  = context,
+                        imageUri = imageUri!!,
+                        folder   = "found_items",
+                        onSuccess = { imageUrl ->
+                            saveFoundItem(db, uid, itemName, category, college,
+                                location, time, description, imageUrl) {
+                                isSubmitting = false
+                                onSubmit()
+                            }
+                        },
+                        onFailure = { error ->
                             isSubmitting = false
-                            submitError = "❌ Failed to submit: ${e.message}"
+                            submitError = "❌ $error"
                         }
+                    )
                 },
                 enabled = canSubmit && !isSubmitting,
                 modifier = Modifier.fillMaxWidth().height(56.dp),
                 shape = RoundedCornerShape(16.dp),
                 colors = ButtonDefaults.buttonColors(
-                    containerColor = Color(0xFF1A6B47), contentColor = Color.White,
+                    containerColor = Color(0xFF1A6B47),
+                    contentColor   = Color.White,
                     disabledContainerColor = Color(0xFF1A6B47).copy(alpha = 0.4f)
                 ),
                 elevation = ButtonDefaults.buttonElevation(defaultElevation = 4.dp)
