@@ -13,3 +13,6 @@
 .externalNativeBuild
 .cxx
 local.properties
+# Sensitive data
+local.properties
+SendGridEmailService.kt

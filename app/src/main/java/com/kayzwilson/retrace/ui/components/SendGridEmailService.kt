@@ -9,7 +9,7 @@ import android.util.Log
 
 object SendGridEmailService {
 
-    private const val SENDGRID_API_KEY = "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"
+    private const val SENDGRID_API_KEY = "YOUR_SENDGRID_API_KEY_HERE"
     private const val SENDGRID_API_URL = "https://api.sendgrid.com/v3/mail/send"
     private const val TAG = "SendGridEmail"
 
