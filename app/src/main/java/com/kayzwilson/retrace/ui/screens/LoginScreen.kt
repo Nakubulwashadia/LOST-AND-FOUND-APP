@@ -17,6 +17,7 @@ import androidx.compose.material.icons.filled.Visibility
 import androidx.compose.material.icons.filled.VisibilityOff
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
+import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.shadow
@@ -45,23 +46,34 @@ import com.kayzwilson.retrace.ui.theme.RetraceWhite
 
 import com.kayzwilson.retrace.ui.components.RetraceScreenHeader
 
+import androidx.lifecycle.viewmodel.compose.viewModel
+import com.kayzwilson.retrace.viewmodel.AuthViewModel
+import com.kayzwilson.retrace.viewmodel.LostViewModel
+
+// ─── Login Screen ─────────────────────────────────────────────────────────────
 @Composable
 fun LoginScreen(
+    viewModel: AuthViewModel,
     onNavigateToSignUp: () -> Unit,
     onLoginSuccess: () -> Unit
 ) {
     val focusManager = LocalFocusManager.current
-    var email           by remember { mutableStateOf("") }
-    var password        by remember { mutableStateOf("") }
-    var passwordVisible by remember { mutableStateOf(false) }
-    var rememberMe      by remember { mutableStateOf(false) }
-    var isLoading       by remember { mutableStateOf(false) }
-    var loginErrorMessage by remember { mutableStateOf("") }
+    val uiState by viewModel.uiState.collectAsState()
+
+    // ✅ rememberSaveable: field values survive rotation
+    var email           by rememberSaveable { mutableStateOf("") }
+    var password        by rememberSaveable { mutableStateOf("") }
+    var passwordVisible by rememberSaveable { mutableStateOf(false) }
+    var rememberMe      by rememberSaveable { mutableStateOf(false) }
 
     val emailError    = email.isNotEmpty() && !android.util.Patterns.EMAIL_ADDRESS.matcher(email).matches()
     val passwordError = password.isNotEmpty() && password.length < 6
-    val canSubmit     = email.isNotEmpty() && password.isNotEmpty() && !emailError && !passwordError
-    val auth = FirebaseAuth.getInstance()
+    val canSubmit     = email.isNotEmpty() && password.isNotEmpty() && !emailError && !passwordError && !uiState.isLoading
+
+    // Navigate when ViewModel signals success
+    LaunchedEffect(uiState.isSuccess) {
+        if (uiState.isSuccess) onLoginSuccess()
+    }
 
     Box(modifier = Modifier.fillMaxSize().background(RetraceLightBg)) {
         RetraceScreenHeader()
@@ -101,10 +113,7 @@ fun LoginScreen(
                     modifier = Modifier.padding(horizontal = 24.dp, vertical = 32.dp),
                     horizontalAlignment = Alignment.CenterHorizontally
                 ) {
-                    Text(
-                        "Welcome back", fontSize = 22.sp,
-                        fontWeight = FontWeight.Bold, color = RetraceNavy
-                    )
+                    Text("Welcome back", fontSize = 22.sp, fontWeight = FontWeight.Bold, color = RetraceNavy)
                     Spacer(modifier = Modifier.height(4.dp))
                     Text("Sign in to continue", fontSize = 14.sp, color = RetraceGrey)
                     Spacer(modifier = Modifier.height(28.dp))
@@ -114,17 +123,13 @@ fun LoginScreen(
                         label = "Email address", placeholder = "you@campus.ac.ug",
                         isError = emailError, errorMessage = "Enter a valid email",
                         leadingIcon = {
-                            Icon(
-                                Icons.Default.Email, null,
-                                tint = if (emailError) RetraceError else RetraceMidBlue
-                            )
+                            Icon(Icons.Default.Email, null,
+                                tint = if (emailError) RetraceError else RetraceMidBlue)
                         },
                         keyboardOptions = KeyboardOptions(
-                            keyboardType = KeyboardType.Email, imeAction = ImeAction.Next
-                        ),
+                            keyboardType = KeyboardType.Email, imeAction = ImeAction.Next),
                         keyboardActions = KeyboardActions(
-                            onNext = { focusManager.moveFocus(FocusDirection.Down) }
-                        )
+                            onNext = { focusManager.moveFocus(FocusDirection.Down) })
                     )
                     Spacer(modifier = Modifier.height(16.dp))
                     RetraceTextField(
@@ -133,29 +138,24 @@ fun LoginScreen(
                         isError = passwordError,
                         errorMessage = "Password must be at least 6 characters",
                         leadingIcon = {
-                            Icon(
-                                Icons.Default.Lock, null,
-                                tint = if (passwordError) RetraceError else RetraceMidBlue
-                            )
+                            Icon(Icons.Default.Lock, null,
+                                tint = if (passwordError) RetraceError else RetraceMidBlue)
                         },
                         trailingIcon = {
                             IconButton(onClick = { passwordVisible = !passwordVisible }) {
                                 Icon(
-                                    imageVector = if (passwordVisible)
-                                        Icons.Default.Visibility else Icons.Default.VisibilityOff,
+                                    imageVector = if (passwordVisible) Icons.Default.Visibility
+                                    else Icons.Default.VisibilityOff,
                                     contentDescription = if (passwordVisible) "Hide" else "Show",
                                     tint = RetraceGrey
                                 )
                             }
                         },
-                        visualTransformation = if (passwordVisible)
-                            VisualTransformation.None else PasswordVisualTransformation(),
+                        visualTransformation = if (passwordVisible) VisualTransformation.None
+                        else PasswordVisualTransformation(),
                         keyboardOptions = KeyboardOptions(
-                            keyboardType = KeyboardType.Password, imeAction = ImeAction.Done
-                        ),
-                        keyboardActions = KeyboardActions(
-                            onDone = { focusManager.clearFocus() }
-                        )
+                            keyboardType = KeyboardType.Password, imeAction = ImeAction.Done),
+                        keyboardActions = KeyboardActions(onDone = { focusManager.clearFocus() })
                     )
                     Spacer(modifier = Modifier.height(12.dp))
 
@@ -171,39 +171,27 @@ fun LoginScreen(
                             Checkbox(
                                 checked = rememberMe, onCheckedChange = { rememberMe = it },
                                 colors = CheckboxDefaults.colors(
-                                    checkedColor = RetraceMidBlue, uncheckedColor = RetraceGrey
-                                )
+                                    checkedColor = RetraceMidBlue, uncheckedColor = RetraceGrey)
                             )
                             Spacer(modifier = Modifier.width(4.dp))
                             Text("Remember me", fontSize = 13.sp, color = RetraceGrey)
                         }
                         TextButton(onClick = { }) {
-                            Text(
-                                "Forgot password?", fontSize = 13.sp,
-                                color = RetraceMidBlue, fontWeight = FontWeight.SemiBold
-                            )
+                            Text("Forgot password?", fontSize = 13.sp,
+                                color = RetraceMidBlue, fontWeight = FontWeight.SemiBold)
                         }
                     }
                     Spacer(modifier = Modifier.height(24.dp))
 
-                    if (loginErrorMessage.isNotEmpty()) {
-                        Text(text = loginErrorMessage, color = RetraceError, fontSize = 13.sp)
+                    // Error message from ViewModel
+                    if (uiState.error.isNotEmpty()) {
+                        Text(text = uiState.error, color = RetraceError, fontSize = 13.sp)
                         Spacer(modifier = Modifier.height(8.dp))
                     }
 
                     Button(
-                        onClick = {
-                            isLoading = true
-                            loginErrorMessage = ""
-                            auth.signInWithEmailAndPassword(email, password)
-                                .addOnCompleteListener { task ->
-                                    isLoading = false
-                                    if (task.isSuccessful) onLoginSuccess()
-                                    else loginErrorMessage =
-                                        task.exception?.message ?: "Login failed ❌"
-                                }
-                        },
-                        enabled = canSubmit && !isLoading,
+                        onClick = { viewModel.login(email, password) },
+                        enabled = canSubmit,
                         modifier = Modifier.fillMaxWidth().height(54.dp),
                         shape = RoundedCornerShape(14.dp),
                         colors = ButtonDefaults.buttonColors(
@@ -212,22 +200,19 @@ fun LoginScreen(
                         ),
                         elevation = ButtonDefaults.buttonElevation(defaultElevation = 4.dp)
                     ) {
-                        if (isLoading)
+                        if (uiState.isLoading) {
                             CircularProgressIndicator(
                                 modifier = Modifier.size(22.dp),
-                                color = RetraceWhite, strokeWidth = 2.5.dp
-                            )
-                        else Text(
-                            "Sign In", fontSize = 16.sp,
-                            fontWeight = FontWeight.Bold, letterSpacing = 1.sp
-                        )
+                                color = RetraceWhite, strokeWidth = 2.5.dp)
+                        } else {
+                            Text("Sign In", fontSize = 16.sp,
+                                fontWeight = FontWeight.Bold, letterSpacing = 1.sp)
+                        }
                     }
                     Spacer(modifier = Modifier.height(24.dp))
 
-                    Row(
-                        modifier = Modifier.fillMaxWidth(),
-                        verticalAlignment = Alignment.CenterVertically
-                    ) {
+                    Row(modifier = Modifier.fillMaxWidth(),
+                        verticalAlignment = Alignment.CenterVertically) {
                         HorizontalDivider(modifier = Modifier.weight(1f), color = Color(0xFFDDE3F0))
                         Text("  Don't have an account?  ", fontSize = 12.sp, color = RetraceGrey)
                         HorizontalDivider(modifier = Modifier.weight(1f), color = Color(0xFFDDE3F0))

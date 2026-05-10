@@ -28,13 +28,13 @@ fun BottomNavBar(
         horizontalArrangement = Arrangement.SpaceEvenly
     ) {
         NavItem(
-            icon = "",
+            icon = "⚠️",
             label = "Lost",
             isActive = activeTab == NavTab.LOST,
             onClick = onNavigateToLost
         )
         NavItem(
-            icon = "",
+            icon = "✅",
             label = "Found",
             isActive = activeTab == NavTab.FOUND,
             onClick = onNavigateToFound

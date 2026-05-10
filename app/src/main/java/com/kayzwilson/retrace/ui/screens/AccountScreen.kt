@@ -229,13 +229,6 @@ fun AccountScreen(
                 }
             }
 
-            Spacer(modifier = Modifier.height(16.dp))
-
-            Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(12.dp)) {
-                StatCard(value = lostCount.toString(),    label = "Lost Items",    icon = "⚠️", modifier = Modifier.weight(1f))
-                StatCard(value = foundCount.toString(),   label = "Found Items",   icon = "✅", modifier = Modifier.weight(1f))
-                StatCard(value = reportsCount.toString(), label = "Total Reports", icon = "📊", modifier = Modifier.weight(1f))
-            }
 
             Spacer(modifier = Modifier.height(20.dp))
 
