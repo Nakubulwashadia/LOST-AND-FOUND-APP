@@ -1,3 +1,5 @@
+import java.util.Properties
+
 plugins {
     alias(libs.plugins.android.application)
     alias(libs.plugins.kotlin.compose)
@@ -20,6 +22,14 @@ android {
         versionName = "1.0"
 
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
+
+        // Add this:
+        val localProperties = Properties()
+        val localPropertiesFile = rootProject.file("local.properties")
+        if (localPropertiesFile.exists()) {
+            localProperties.load(localPropertiesFile.inputStream())
+        }
+        buildConfigField("String", "SENDGRID_API_KEY", "\"${localProperties.getProperty("SENDGRID_API_KEY", "")}\"")
     }
 
     buildTypes {
@@ -37,6 +47,18 @@ android {
     }
     buildFeatures {
         compose = true
+        buildConfig = true
+    }
+
+    packaging {
+        resources {
+            pickFirsts.add("META-INF/DEPENDENCIES")
+            pickFirsts.add("META-INF/LICENSE")
+            pickFirsts.add("META-INF/NOTICE")
+            pickFirsts.add("META-INF/LICENSE.txt")
+            pickFirsts.add("META-INF/NOTICE.txt")
+            pickFirsts.add("META-INF/ASL2.0")
+        }
     }
 }
 
@@ -66,5 +88,5 @@ dependencies {
     debugImplementation(libs.androidx.compose.ui.test.manifest)
     implementation("io.coil-kt:coil-compose:2.6.0")
     implementation("androidx.lifecycle:lifecycle-viewmodel-compose:2.7.0")
-
+    implementation("com.sendgrid:sendgrid-java:4.10.1")
 }

@@ -321,8 +321,11 @@ fun ReportFoundItemScreen(onSubmit: () -> Unit, onBack: () -> Unit) {
                     submitError = ""
                     val db  = FirebaseFirestore.getInstance()
                     val uid = FirebaseAuth.getInstance().currentUser?.uid
+                    val auth = FirebaseAuth.getInstance().currentUser
 
-                    // Image is mandatory on found form so imageUri is never null here
+                    val finderEmail = auth?.email ?: ""
+                    val finderName = auth?.displayName ?: "Anonymous"
+
                     uploadImageToCloudinary(
                         context  = context,
                         imageUri = imageUri!!,
@@ -330,8 +333,20 @@ fun ReportFoundItemScreen(onSubmit: () -> Unit, onBack: () -> Unit) {
                         onSuccess = { imageUrl ->
                             saveFoundItem(db, uid, itemName, category, college,
                                 location, time, description, imageUrl) {
-                                isSubmitting = false
-                                onSubmit()
+
+                                // Start the matching process in background
+                                val viewModel = com.kayzwilson.retrace.viewmodel.ItemMatchingViewModel()
+                                viewModel.checkAndNotifyMatches(
+                                    foundItemCategory = category,
+                                    foundItemLocation = location,
+                                    foundItemDescription = description,
+                                    finderName = finderName,
+                                    finderContact = finderEmail
+                                ) { successCount, failureCount ->
+                                    isSubmitting = false
+                                    submitError = "✅ Report submitted!"
+                                    onSubmit()
+                                }
                             }
                         },
                         onFailure = { error ->
