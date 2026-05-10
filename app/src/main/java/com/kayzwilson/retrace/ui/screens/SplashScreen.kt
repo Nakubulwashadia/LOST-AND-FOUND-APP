@@ -25,17 +25,11 @@ fun SplashScreen() {
     ) {
         Column(horizontalAlignment = Alignment.CenterHorizontally) {
             Image(
-                painter = painterResource(id = R.drawable.retrace_logo),
+                painter = painterResource(id = R.drawable.retrace_logo_new),
                 contentDescription = "Retrace Logo",
-                modifier = Modifier.size(180.dp)
+                modifier = Modifier.size(360.dp)
             )
-            Spacer(modifier = Modifier.height(16.dp))
-            Text(
-                "RETRACE",
-                fontSize = 32.sp,
-                fontWeight = FontWeight.Bold,
-                color = RetraceNavy
-            )
+
         }
     }
 }
